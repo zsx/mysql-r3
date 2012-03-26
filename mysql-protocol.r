@@ -163,7 +163,6 @@ make root-protocol [
 		conv-list: 
 		character-set:
 		server-status:
-		more-capabilities:
 		seed-length:
 		auth-v11: none
 	]
@@ -330,7 +329,6 @@ make root-protocol [
 			"Thread ID:" 				obj/thread-id 				newline
 			"Crypt Seed:"				obj/crypt-seed				newline
 			"Capabilities:"				mold decode/features 		obj/capabilities 		newline
-			"More Capabilities:"		mold decode/features/more 	obj/more-capabilities 	newline
 			"Seed length:"				obj/seed-length 			newline
 			"-------------------"
 		]	
@@ -809,7 +807,7 @@ make root-protocol [
 			read-int	(pl/capabilities: int)
 			read-byte	(pl/character-set: byte)
 			read-int	(pl/server-status: int) 
-			read-int	(pl/more-capabilities: int)
+			read-int	(pl/capabilities: (shift/left int 16) or pl/capabilities)
 			read-byte	(pl/seed-length: byte)
 			10 skip		; reserved for future use
 			read-string	(
@@ -828,9 +826,8 @@ make root-protocol [
 
 		show-server pl
 
-		feature-supported?: func ['feature /local n] [
-			n: select defs/client feature
-			either n = (n and pl/more-capabilities) [n] [0]
+		feature-supported?: func ['feature] [
+			(select defs/client feature) and pl/capabilities
 		]
 
 		client-param: defs/client/found-rows or defs/client/connect-with-db
