@@ -693,7 +693,7 @@ make root-protocol [
 		join value to char! 0
 	]
 
-	write-n-bytes: func [value [integer!] n [integer!]][
+	write-n-bytes: func [value [integer!] n [integer!] /local ret][
 		if negative? n [return ""]
 		ret: ""
 		loop n [ret: join ret to char! value]
