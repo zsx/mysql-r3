@@ -843,7 +843,7 @@ make root-protocol [
 			;write-long (length? port/user) + (length? port/pass)
 			;	+ 7 + std-header-length
 			write-long 16777216 ;max packet length, the value is from mysql.exe
-			write-byte 8 ; latin charset
+			write-byte pl/character-set
 			write-n-bytes 0 23 ; 23 0's
 			write-string port/user
 			write-byte 20
