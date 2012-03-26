@@ -169,6 +169,7 @@ make root-protocol [
 
 	column-class: make object! [
 		table: name: length: type: flags: decimals: none
+		catalog: db: org_table: org_name: charsetnr: length: default: none
 	]
 	
 	my-to-date: func [v][any [attempt [to date! v] 1-jan-0000]]
@@ -559,7 +560,7 @@ make root-protocol [
 			pl/stream-end?: true			
 			net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
 		]
-		if all [status = 254 packet-len = 1][pl/stream-end?: true]
+		if all [status = 254 packet-len = (either pl/protocol > 9 [5][1])][pl/stream-end?: true]
 		pl/buffer
 	]
 	
@@ -591,20 +592,41 @@ make root-protocol [
 		colnb
 	]
 	
-	read-columns-headers: func [port [port!] cols [integer!] /local pl col][
+	read-columns-headers: func [port [port!] cols [integer!] /local pl col pack][
 		pl: port/locals
 		pl/columns: make block! cols
 		loop cols [
 			col: make column-class []
-			parse/all/case read-packet port [
-				read-field	(col/table:	field)
-				read-field	(col/name: 	field)
-				read-nbytes	(col/length: len)
-				read-nbytes	(col/type: decode/type len)
-				read-field	(
-					col/flags: decode/flags to integer! field/1 
-					col/decimals: to integer! field/2 
-				)
+			pack: read-packet port
+			net-log reform ["pack: " pack]
+			either pl/protocol > 9 [
+				parse/all/case pack [
+					read-field 	(col/catalog: field)
+					read-field 	(col/db: field)
+					read-field	(col/table:	field)
+					read-field	(col/org_table:	field)
+					read-field	(col/name: 	field)
+					read-field	(col/org_name: 	field)
+					read-byte	;filler
+					read-int	(col/charsetnr: int)
+					read-long	(col/length: long)
+					read-byte	(col/type: decode/type byte)
+					read-int	(col/flags: decode/flags int)
+					read-byte	(col/decimals: byte)
+					read-int	;filler, always 0
+					;read-nbytes	(col/default: len)
+				]
+			][
+				parse/all/case pack [
+					read-field	(col/table:	field)
+					read-field	(col/name: 	field)
+					read-nbytes	(col/length: len)
+					read-nbytes	(col/type: decode/type len)
+					read-field	(
+						col/flags: decode/flags to integer! field/1 
+						col/decimals: to integer! field/2 
+					)
+				]
 			]
 			append pl/columns :col
 		]
