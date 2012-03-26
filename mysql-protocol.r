@@ -236,8 +236,7 @@ make root-protocol [
 		]
 	]
 	
-	decode: func [int [integer!] /features /flags /type /more /local list name value][
-		if more [int: shift/left int 16]
+	decode: func [int [integer!] /features /flags /type /local list name value][
 		either type [
 			any [select defs/types int 'unknown]
 		][
@@ -833,10 +832,10 @@ make root-protocol [
 		client-param: defs/client/found-rows or defs/client/connect-with-db
 		client-param: either pl/protocol > 9 [
 			client-param 
-			or defs/client/long-password 
-			or defs/client/transactions 
-			or defs/client/protocol-41
-			or defs/client/secure-connection
+			or feature-supported? long-password 
+			or feature-supported? transactions 
+			or feature-supported? protocol-41
+			or feature-supported? secure-connection
 			or feature-supported? multi-queries
 			or feature-supported? multi-results
 		][
