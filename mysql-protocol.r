@@ -125,11 +125,9 @@ make root-protocol [
 			ignore-sigpipe		4096	; IGNORE sigpipes
 			transactions		8196	; Client knows about transactions
 			protocol-41-old		16384	; protocol 4.1 (old flag)
-			authorization-41	32768	; 4.1 authorization
-			;reserved			16384	; for 4.1.0 only
-			;secure-connection	32768	; use new hashing algorithm
+			secure-connection	32768	; use new hashing algorithm
 			multi-queries		65536	; enable/disable multiple queries support
-    			multi-results		131072	; enable/disable multiple result sets
+    		multi-results		131072	; enable/disable multiple result sets
 		]
 	]
 
@@ -780,7 +778,7 @@ make root-protocol [
 		]
 	]
 	
-	do-handshake: func [port [port!] /local pl client-param key err data][
+	do-handshake: func [port [port!] /local pl client-param auth-pack key err data][
 		either pl: port/locals [
 			clear pl/cache
 			clear pl/buffer
@@ -823,25 +821,37 @@ make root-protocol [
 		client-param: either pl/protocol > 9 [
 			client-param 
 			or defs/client/long-password 
-			or defs/client/authorization-41 
 			or defs/client/transactions 
 			or defs/client/protocol-41
+			or defs/client/secure-connection
 			or defs/client/multi-queries
 			or defs/client/multi-results
 		][
 			client-param and complement defs/client/long-password
 		]
-		send-packet port rejoin [
-			write-long client-param
-			;write-long (length? port/user) + (length? port/pass)
-			;	+ 7 + std-header-length
-			write-long 16777216 ;max packet length, the value is from mysql.exe
-			write-byte pl/character-set
-			head change/dup "" to char! 0 23; 23 0's
-			write-string port/user
-			write-byte 20
-			write-string rejoin [(key: scramble port/pass port) any [port/path ""] ]
+		auth-pack: either pl/protocol > 9 [
+			rejoin [
+				write-long client-param
+				;write-long (length? port/user) + (length? port/pass)
+				;	+ 7 + std-header-length
+				write-long 16777216 ;max packet length, the value is from mysql.exe
+				write-byte pl/character-set
+				head change/dup "" to char! 0 23; 23 0's
+				write-string port/user
+				write-byte 20
+				write-string rejoin [(key: scramble port/pass port) any [port/path ""] ]
+			]
+		][
+			rejoin [
+				write-long client-param
+				write-long (length? port/user) + (length? port/pass)
+					+ 7 + std-header-length
+				write-string port/user
+				write-string key: scramble port/pass port
+				write-string any [port/path ""]
+			]
 		]
+		send-packet port auth-pack
 	
 		either error? set/any 'err try [data: read-packet port][
 			any [all [find key #{00} pl/error-code] err]	; -- detect the flaw in the protocol
