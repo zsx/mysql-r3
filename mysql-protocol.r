@@ -834,7 +834,7 @@ make root-protocol [
 				write-long client-param
 				;write-long (length? port/user) + (length? port/pass)
 				;	+ 7 + std-header-length
-				write-long 16777216 ;max packet length, the value is from mysql.exe
+				write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
 				write-byte pl/character-set
 				head change/dup "" to char! 0 23; 23 0's
 				write-string port/user
