@@ -693,13 +693,6 @@ make root-protocol [
 		join value to char! 0
 	]
 
-	write-n-bytes: func [value [integer!] n [integer!] /local ret][
-		if negative? n [return ""]
-		ret: ""
-		loop n [ret: join ret to char! value]
-		ret
-	]
-
 	send-packet: func [port [port!] data [string!]][
 		data: to-binary rejoin [
 			write-int24 length? data
@@ -844,7 +837,7 @@ make root-protocol [
 			;	+ 7 + std-header-length
 			write-long 16777216 ;max packet length, the value is from mysql.exe
 			write-byte pl/character-set
-			write-n-bytes 0 23 ; 23 0's
+			head change/dup "" to char! 0 23; 23 0's
 			write-string port/user
 			write-byte 20
 			write-string rejoin [(key: scramble port/pass port) any [port/path ""] ]
