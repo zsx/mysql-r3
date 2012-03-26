@@ -34,7 +34,7 @@ make root-protocol [
 
 ;------ Internals --------
 
-	defs: [
+	defs: compose/deep [
 		cmd [
 			;sleep			0
 			quit			1
@@ -124,10 +124,14 @@ make root-protocol [
 			ssl					2048	; Switch to SSL after handshake
 			ignore-sigpipe		4096	; IGNORE sigpipes
 			transactions		8196	; Client knows about transactions
-			protocol-41-old		16384	; protocol 4.1 (old flag)
+			reserved			16384	; protocol 4.1 (old flag)
 			secure-connection	32768	; use new hashing algorithm
 			multi-queries		65536	; enable/disable multiple queries support
     		multi-results		131072	; enable/disable multiple result sets
+    		ps-multi-results	(shift/left 1 18)	; multiple result sets in PS-protocol
+			plugin-auth			(shift/left 1 19) ; Client supports plugin authentication
+			ssl-verify-server-cert	(shift/left 1 30)
+			remember-options		(shift/left 1 31)
 		]
 	]
 
@@ -159,6 +163,8 @@ make root-protocol [
 		conv-list: 
 		character-set:
 		server-status:
+		more-capabilities:
+		seed-length:
 		auth-v11: none
 	]
 
@@ -231,7 +237,8 @@ make root-protocol [
 		]
 	]
 	
-	decode: func [int [integer!] /features /flags /type /local list name value][
+	decode: func [int [integer!] /features /flags /type /more /local list name value][
+		if more [int: shift/left int 16]
 		either type [
 			any [select defs/types int 'unknown]
 		][
@@ -316,13 +323,15 @@ make root-protocol [
 	]
 	
 	show-server: func [obj [object!]][
-		net-log reform [						newline
-			"----- Server ------" 				newline
-			"Version:"			obj/version		newline
-			"Protocol version:"	obj/protocol 	newline
-			"Thread ID:" 		obj/thread-id 	newline
-			"Crypt Seed:"		obj/crypt-seed	newline
-			"Capabilities:"		mold obj/capabilities newline
+		net-log reform [											newline
+			"----- Server ------" 									newline
+			"Version:"					obj/version					newline
+			"Protocol version:"			obj/protocol 				newline
+			"Thread ID:" 				obj/thread-id 				newline
+			"Crypt Seed:"				obj/crypt-seed				newline
+			"Capabilities:"				mold decode/features 		obj/capabilities 		newline
+			"More Capabilities:"		mold decode/features/more 	obj/more-capabilities 	newline
+			"Seed length:"				obj/seed-length 			newline
 			"-------------------"
 		]	
 	]
@@ -797,10 +806,12 @@ make root-protocol [
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
 			read-string	(pl/crypt-seed: string)
-			read-int	(pl/capabilities: decode/features int)
+			read-int	(pl/capabilities: int)
 			read-byte	(pl/character-set: byte)
 			read-int	(pl/server-status: int) 
-			13 skip		; reserved for future use
+			read-int	(pl/more-capabilities: int)
+			read-byte	(pl/seed-length: byte)
+			10 skip		; reserved for future use
 			read-string	(
 				if string [
 					pl/crypt-seed: join copy* pl/crypt-seed string
@@ -817,6 +828,11 @@ make root-protocol [
 
 		show-server pl
 
+		feature-supported?: func ['feature /local n] [
+			n: select defs/client feature
+			either n = (n and pl/more-capabilities) [n] [0]
+		]
+
 		client-param: defs/client/found-rows or defs/client/connect-with-db
 		client-param: either pl/protocol > 9 [
 			client-param 
@@ -824,8 +840,8 @@ make root-protocol [
 			or defs/client/transactions 
 			or defs/client/protocol-41
 			or defs/client/secure-connection
-			or defs/client/multi-queries
-			or defs/client/multi-results
+			or feature-supported? multi-queries
+			or feature-supported? multi-results
 		][
 			client-param and complement defs/client/long-password
 		]
