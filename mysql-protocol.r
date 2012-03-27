@@ -598,7 +598,6 @@ make root-protocol [
 		loop cols [
 			col: make column-class []
 			pack: read-packet port
-			net-log reform ["pack: " pack]
 			either pl/protocol > 9 [
 				parse/all/case pack [
 					read-field 	(col/catalog: field)
@@ -614,7 +613,7 @@ make root-protocol [
 					read-int	(col/flags: decode/flags int)
 					read-byte	(col/decimals: byte)
 					read-int	;filler, always 0
-					;read-nbytes	(col/default: len)
+					read-nbytes	(col/default: len)
 				]
 			][
 				parse/all/case pack [
