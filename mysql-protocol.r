@@ -613,7 +613,7 @@ make root-protocol [
 					read-int	(col/flags: decode/flags int)
 					read-byte	(col/decimals: byte)
 					read-int	;filler, always 0
-					read-nbytes	(col/default: len)
+					read-length	(col/default: len)
 				]
 			][
 				parse/all/case pack [
