@@ -476,10 +476,10 @@ make root-protocol [
 	read-long: [
 		read-byte (b0: byte)
 		read-byte (b1: byte)
-		read-byte (b2: byte) 
+		read-byte (b2: byte)
 		read-byte (
 			b3: byte
-			long: to integer! b0 + (256 * b1) + (65536 * b2) + (16777216.0 * b3)
+			long: to-integer b0 or (shift/left b1 8) or (shift/left b2 16) or (shift/left b3 24)
 		)
 	]
 	read-long64: [
