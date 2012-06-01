@@ -1,11 +1,11 @@
 REBOL [
 	Title: "MySQL Protocol"
-	Author: "Nenad Rakocevic / SOFTINNOV"
+	Authors: ["Nenad Rakocevic / SOFTINNOV" "Shixin Zeng <szeng@atronixengineering.com>"]
 	Email: mysql@softinnov.com
 	Web: http://softinnov.org/rebol/mysql.shtml
-	Date: 12/07/2008
+	Date: 06/01/2012
 	File: %mysql-protocol.r
-	Version: 1.2.1
+	Version: 1.3.1
 	Purpose: "MySQL Driver for REBOL"
 ]
 
@@ -141,6 +141,8 @@ make root-protocol [
 		buf-size: cache-size: 10000
 		last-status:
 		stream-end?:
+		more-results?:
+		expecting: none
 		buffer: none
 		cache: none
 	;-------
@@ -149,6 +151,7 @@ make root-protocol [
 		auto-conv?: on
 		auto-ping?: on
 		flat?: off
+		delimiter: #";"
 		newlines?: value? 'new-line
 		init:
 		matched-rows:
@@ -462,8 +465,10 @@ make root-protocol [
 	null-flag: false
 	ws: charset " ^-^M^/"
 
-	read-string: [[copy string to null null] | [copy string to end]]
+	read-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
 	read-byte: [copy byte byte-char (byte: to integer! to char! :byte)]
+
+	;mysql uses little endian for all integers
 	read-int: [
 		read-byte (b0: byte)
 		read-byte (b1: byte	int: b0 + (256 * b1))
@@ -479,28 +484,21 @@ make root-protocol [
 		read-byte (b2: byte)
 		read-byte (
 			b3: byte
-			long: to-integer b0 or (shift/left b1 8) or (shift/left b2 16) or (shift/left b3 24)
+			long: to-integer b0 or (shift/left b1 8) or (shift/left b2 16) or (shift/left b3 24) ;use or instead of arithmetic operations since rebol doesn't handle unsigned integers and the number could be larger than (2^31 - 1)
 		)
 	]
 	read-long64: [
 		read-long
 		skip 4 byte (net-log "Warning: long64 type detected !")
 	]
-	read-length: [
+	read-length: [; length coded binary
 		#"^(FB)" (len: 0 null-flag: true)
 		| #"^(FC)" read-int (len: int)
 		| #"^(FD)" read-int24 (len: int24)
-		| #"^(FE)" read-long (len: long)
+		| #"^(FE)" read-long64 (len: long)
 		| read-byte (len: byte)
 	]
-	read-nbytes: [
-		#"^(01)" read-byte (len: byte)
-		| #"^(02)" read-int (len: int)
-		| #"^(03)" read-int24 (len: int24)
-		| #"^(04)" read-long (len: long)
-		| none (len: 255)
-	]
-	read-field: [
+	read-field: [ ;length coded string
 		(null-flag: false)
 		read-length s: (either null-flag [field: none]
 			[field:	copy*/part s len s: skip s len]) :s
@@ -511,7 +509,7 @@ make root-protocol [
 		if any [zero? len negative? len][
 			close* port/sub-port			
 			throw throws/closed
-		]		
+		]
 		net-log reform ["low level read of" len "bytes"] 
 		len
 	]
@@ -548,19 +546,51 @@ make root-protocol [
 		]	
 		pl/last-status: status: to integer! pl/buffer/1
 		pl/error-code: pl/error-msg: none
-		
-		if status = 255 [
-			parse/all next pl/buffer either any [none? pl/protocol pl/protocol > 9][
-				[	read-int 	(pl/error-code: int)
-					read-string (pl/error-msg: string)]
-			][
-				pl/error-code: 0
-				[	read-string (pl/error-msg: string)]
+	
+		switch status [
+			255 [
+				parse/all next pl/buffer case [
+					pl/capabilities and defs/client/protocol-41 [
+						[
+							read-int 	(pl/error-code: int)
+							6 skip
+							read-string (pl/error-msg: string)
+						]
+					]
+					any [none? pl/protocol pl/protocol > 9][
+						[
+							read-int 	(pl/error-code: int)
+							read-string (pl/error-msg: string)
+						]
+					]
+					true [
+						pl/error-code: 0
+						[read-string (pl/error-msg: string)]
+					]
+				]
+				pl/stream-end?: true			
+				net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
 			]
-			pl/stream-end?: true			
-			net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
+			254 [
+				case [
+					packet-len = 5 [
+						pl/more-results?: not zero? pl/buffer/4 and 8
+						pl/stream-end?: true
+					]
+					packet-len = 1 [pl/stream-end?: true]
+				]
+			]
+			0 [
+				if none? pl/expecting [
+					parse/all/case next pl/buffer [
+						read-length	(pl/matched-rows: len)
+						read-length
+						read-int	(pl/more-results?: not zero? int and 8)
+					]
+					pl/stream-end?: true
+				]
+			]
 		]
-		if all [status = 254 packet-len = (either pl/protocol > 9 [5][1])][pl/stream-end?: true]
 		pl/buffer
 	]
 	
@@ -582,13 +612,15 @@ make root-protocol [
 		pl/cache
 	]
 	
-	read-columns-number: func [port [port!] /local colnb][
+	read-columns-number: func [port [port!] /local colnb pl][
+		pl: port/locals
 		parse/all/case read-packet port [
-			read-length (if zero? colnb: len [port/locals/stream-end?: true])
-			read-length	(port/locals/matched-rows: len)
+			read-length (if zero? colnb: len [pl/stream-end?: true])
+			read-length	(pl/matched-rows: len)
 			read-length 
+			read-int	(pl/more-results?: not zero? int and 8)
 		]
-		if not zero? colnb [port/locals/matched-rows: none]
+		if not zero? colnb [pl/matched-rows: none]
 		colnb
 	]
 	
@@ -598,7 +630,7 @@ make root-protocol [
 		loop cols [
 			col: make column-class []
 			pack: read-packet port
-			either pl/protocol > 9 [
+			either pl/capabilities and defs/client/protocol-41 [
 				parse/all/case pack [
 					read-field 	(col/catalog: field)
 					read-field 	(col/db: field)
@@ -619,12 +651,10 @@ make root-protocol [
 				parse/all/case pack [
 					read-field	(col/table:	field)
 					read-field	(col/name: 	field)
-					read-nbytes	(col/length: len)
-					read-nbytes	(col/type: decode/type len)
-					read-field	(
-						col/flags: decode/flags to integer! field/1 
-						col/decimals: to integer! field/2 
-					)
+					read-length	(col/length: len)
+					read-length	(col/type: decode/type len)
+					read-length	(col/flags: decode/flags len)
+					read-byte	(col/decimals: byte)
 				]
 			]
 			append pl/columns :col
@@ -634,6 +664,7 @@ make root-protocol [
 			flush-pending-data port
 			net-error "Error: end of columns stream not found"
 		]
+		pl/expecting: 'rows
 		pl/stream-end?: false		; prepare correct state for 
 		clear pl/cache				; rows reading.
 	]
@@ -665,6 +696,7 @@ make root-protocol [
 				new-line/all rows true
 			]
 		]
+		pl/expecting: none
 		rows
 	]
 	
@@ -677,17 +709,34 @@ make root-protocol [
 		]
 	]
 	
-	flush-pending-data: func [port [port!] /local pl len][
-		pl: port/locals
-		if not pl/stream-end? [
-			net-log "flushing unread data..."
-			until [
-				clear pl/buffer
-				len: read port pl/buffer pl/buf-size			
-				all [pl/buf-size > len end-marker = last pl/buffer]
+	flush-pending-data: func [port [port!] /local pl len EOF?][
+		if throws/closed = catch [
+			pl: port/locals
+			if any [not pl/stream-end? pl/more-results?][		
+				net-log "flushing unread data..."
+				until [
+					clear pl/buffer
+					len: read port pl/buffer pl/buf-size
+					all [
+						pl/buf-size > len
+						either pl/capabilities and defs/client/protocol-41 [
+							all [
+								any [
+									EOF?: end-marker = pick* tail pl/buffer -5	; EOF packet
+									0 = pick* tail pl/buffer -7					; OK packet
+								]
+								zero? (pick* tail pl/buffer pick* [-2 -4] EOF?) and 8   ; no more results
+							]
+						][
+							end-marker = last pl/buffer
+						]
+					]
+				]
+				net-log "flush end."		
+				pl/stream-end?: true
 			]
-			net-log "flush end."
-			pl/stream-end?: true
+		][
+			try-reconnect port
 		]
 	]
 
@@ -761,14 +810,16 @@ make root-protocol [
 		none
 	]
 	
-	insert-all-queries: func [port [port!] data [string!] /local s e res][
+	insert-all-queries: func [port [port!] data [string!] /local s e res d][
+		d: port/locals/delimiter
 		parse/all s: data [
 			any [
 				#"#" thru newline
-				| #"'" any ["\'" | "''" | not-squote] #"'"
+				| #"'" any ["\\" | "\'" | "''" | not-squote] #"'"
 				|{"} any [{\"} | {""} | not-dquote] {"}
 				| #"`" thru #"`"
-				| e: #";" (
+				| "begin" thru "end"
+				| e: d (
 					clear sql-buffer
 					insert*/part sql-buffer s e
 					res: insert-query port sql-buffer
@@ -795,12 +846,12 @@ make root-protocol [
 	
 	try-reconnect: func [port [port!]][
 		net-log "Connection closed by server! Reconnecting..."
+		port/state/flags: port/state/flags or 1024 or 2 ; avoid triggering READ special actions + reset closed flag
 		if throws/closed = catch [open port][net-error "Server down!"]
 	]
 	
 	check-opened: func [port [port!]][	
 		if not zero? port/sub-port/state/flags and 1024 [
-			port/state/flags: 1024
 			try-reconnect port
 		]
 	]
@@ -851,7 +902,7 @@ make root-protocol [
 		]
 
 		client-param: defs/client/found-rows or defs/client/connect-with-db
-		client-param: either pl/protocol > 9 [
+		client-param: either pl/capabilities and defs/client/protocol-41 [
 			client-param 
 			or feature-supported? long-password 
 			or feature-supported? transactions 
@@ -862,22 +913,23 @@ make root-protocol [
 		][
 			client-param and complement defs/client/long-password
 		]
-		auth-pack: either pl/protocol > 9 [
+		auth-pack: either pl/capabilities and defs/client/protocol-41 [
 			rejoin [
 				write-long client-param
 				;write-long (length? port/user) + (length? port/pass)
 				;	+ 7 + std-header-length
 				write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
 				write-byte pl/character-set
-				head change/dup "" to char! 0 23; 23 0's
+				{^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@} ;23 0's
 				write-string port/user
-				write-byte 20
-				write-string rejoin [(key: scramble port/pass port) any [port/path ""] ]
+				write-byte length? key: scramble port/pass port
+				key
+				write-string any [port/path "^@"]
 			]
 		][
 			rejoin [
-				write-long client-param
-				write-long (length? port/user) + (length? port/pass)
+				write-int client-param
+				write-int24 (length? port/user) + (length? port/pass)
 					+ 7 + std-header-length
 				write-string port/user
 				write-string key: scramble port/pass port
@@ -984,7 +1036,11 @@ make root-protocol [
 					insert-cmd port data
 				]
 			][
-				insert-all-queries port data
+				either port/locals/capabilities and defs/client/protocol-41 [
+					insert-query port data
+				][
+					insert-all-queries port data
+				]
 			]
 		][net-error  "Connection lost - Port closed!"]
 		res
@@ -996,11 +1052,23 @@ make root-protocol [
 		][none]
 	]
 
-	copy: func [port /part data [integer!]][
+	copy: func [port /part data [integer!] /local pl colnb exit?][
 		check-opened port
-		either not port/locals/stream-end? [
-			either all [value? 'part part][read-rows/part port data]
-				[read-rows port]
+		pl: port/locals
+		either any [pl/more-results? not pl/stream-end?][
+			if all [pl/more-results? pl/expecting <> 'rows][
+				colnb: read-columns-number port
+				either any [zero? colnb pl/stream-end?][exit?: yes][
+					read-columns-headers port colnb
+				]
+			]
+			either exit? [none][
+				either all [value? 'part part][
+					read-rows/part port data
+				][
+					read-rows port
+				]
+			]
 		][none]
 	]
 	
