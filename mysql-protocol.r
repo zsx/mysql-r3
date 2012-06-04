@@ -773,7 +773,9 @@ make root-protocol [
 			write-byte port/locals/seq-num: port/locals/seq-num + 1
 			data
 		]
-		write-io port/sub-port data length? data
+		if 0 >= write-io port/sub-port data length? data [
+			throw throws/closed
+		]
 		port/locals/stream-end?: false
 	]
 
