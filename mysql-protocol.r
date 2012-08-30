@@ -524,6 +524,7 @@ make root-protocol [
 	read-packet: func [port [port!] /local packet-len pl status][
 		pl: port/locals
 		pl/stream-end?: false
+		;print ["read-packet expecting: " pl/expecting]
 		
 	;--- reading header ---
 		defrag-read port pl/buffer std-header-length
@@ -591,6 +592,8 @@ make root-protocol [
 				]
 			]
 		]
+		;print ["read-packet stream-end?" pl/stream-end? "more-results:" pl/more-results?]
+		;print ["read-packet returns:" pl/buffer]
 		pl/buffer
 	]
 	
@@ -621,10 +624,12 @@ make root-protocol [
 			read-int	(pl/more-results?: not zero? int and 8)
 		]
 		if not zero? colnb [pl/matched-rows: none]
+		;print ["read-columns-number returns" colnb]
 		colnb
 	]
 	
 	read-columns-headers: func [port [port!] cols [integer!] /local pl col pack][
+		;print ["read-columns-headers"]
 		pl: port/locals
 		pl/columns: make block! cols
 		loop cols [
@@ -803,7 +808,7 @@ make root-protocol [
 	]
 	
 	insert-query: func [port [port!] data [string! block!] /local colnb][
-		net-log data
+		net-log reform ["insert-query:" data]
 		send-cmd port defs/cmd/query data
 		colnb: read-columns-number port
 		if not any [zero? colnb port/locals/stream-end?][
