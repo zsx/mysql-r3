@@ -678,7 +678,7 @@ make root-protocol [
 		count: 0
 		forever [
 			row-data: read-packet-via port
-			if empty? row-data [return rows]		; empty set
+			if empty? row-data [pl/expecting: none return rows]		; empty set
 			row: make block! cols
 			parse/all/case row-data [any [read-field (append row field)]]
 			either pl/flat? [
@@ -1054,24 +1054,63 @@ make root-protocol [
 		][none]
 	]
 
-	copy: func [port /part data [integer!] /local pl colnb exit?][
+	copy: func [port /part data [integer!] /local pl colnb exit? ret tmp][
+		;print ["copy from the port, expecting:" port/locals/expecting]
 		check-opened port
 		pl: port/locals
-		either any [pl/more-results? not pl/stream-end?][
-			if all [pl/more-results? pl/expecting <> 'rows][
+		ret: none
+		next?: false
+		
+		if all [not pl/stream-end?
+				pl/expecting = 'rows] [
+			either all [value? 'part part][
+				tmp: read-rows/part port data
+				unless none? tmp [
+					if none? ret [ret: copy* []]
+					append ret tmp
+					data: data - length? tmp
+				]
+			][
+				tmp: read-rows port
+				unless none? tmp [
+					if none? ret [ret: copy* []]
+					append ret tmp
+				]
+			]
+		]
+
+		if all [part  data <= 0] [return ret]
+
+		while [pl/more-results?] [
+			;print ["gonna retrieve more results, expecting" pl/expecting]
+			if pl/expecting <> 'rows[
 				colnb: read-columns-number port
-				either any [zero? colnb pl/stream-end?][exit?: yes][
+				;print ["colnb: " colnb]
+				either any [zero? colnb pl/stream-end?][next?: yes][
 					read-columns-headers port colnb
 				]
 			]
-			either exit? [none][
+			;print ["__expecting__:" pl/expecting]
+			unless next? [
 				either all [value? 'part part][
-					read-rows/part port data
+					tmp: read-rows/part port data
+					unless none? tmp [
+						if none? ret [ret: copy* []]
+						append ret tmp
+						data: data - length? tmp
+					]
 				][
-					read-rows port
+					tmp: read-rows port
+					unless none? tmp [
+						if none? ret [ret: copy* []]
+						append ret tmp
+					]
 				]
 			]
-		][none]
+			if all [part  data <= 0] [return ret]
+		]
+		;print ["copy returns: " ret]
+		ret
 	]
 	
 	set 'send-sql func [
