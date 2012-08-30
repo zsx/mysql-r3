@@ -724,27 +724,6 @@ make root-protocol [
 								any [
 									EOF?: end-marker = pick* tail pl/buffer -5	; EOF packet
 									0 = pick* tail pl/buffer -7					; OK packet
-									all [pl/stream-end?
-										 pl/more-results? ;ERROR packet
-										 either 3 > length? pl/buffer [
-											false
-										][
-											parse/all pl/buffer [
-												read-int24  (packet-len: int24)
-											]
-											;FIXME: could be there more than one ERROR packets pending?
-											err-pkt?: all [255 = pl/buffer/5 
-														  packet-len + 4 = length? pl/buffer]
-											if err-pkt? [
-												parse/all at pl/buffer 6 [
-													read-int 	(pl/error-code: int)
-													6 skip
-													read-string (pl/error-msg: string)
-												]
-												net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
-											]
-										]
-									]
 								]
 								zero? (pick* tail pl/buffer pick* [-2 -4] EOF?) and 8   ; no more results
 							]
