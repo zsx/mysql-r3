@@ -570,6 +570,7 @@ make root-protocol [
 					]
 				]
 				pl/stream-end?: true			
+				pl/more-results?: false ;no more results following an error. It's not documented, but we don't have a server status word for this, so this should be a valid assumption, and it's confirmed by testing.
 				net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
 			]
 			254 [
@@ -716,30 +717,8 @@ make root-protocol [
 	
 	flush-pending-data: func [port [port!] /local pl len EOF?][
 		if throws/closed = catch [
-			pl: port/locals
-			if any [not pl/stream-end? pl/more-results?][		
-				net-log "flushing unread data..."
-				until [
-					clear pl/buffer
-					len: read port pl/buffer pl/buf-size
-					all [
-						pl/buf-size > len
-						either pl/capabilities and defs/client/protocol-41 [
-							all [
-								any [
-									EOF?: end-marker = pick* tail pl/buffer -5	; EOF packet
-									0 = pick* tail pl/buffer -7					; OK packet
-								]
-								zero? (pick* tail pl/buffer pick* [-2 -4] EOF?) and 8   ; no more results
-							]
-						][
-							end-marker = last pl/buffer
-						]
-					]
-				]
-				net-log "flush end."		
-				pl/stream-end?: true
-			]
+			net-log "flushing unread data..."
+			copy port
 		][
 			try-reconnect port
 		]
