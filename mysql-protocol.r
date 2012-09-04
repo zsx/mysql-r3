@@ -140,7 +140,7 @@ make root-protocol [
 		seq-num: 0
 		buf-size: cache-size: 10000
 		last-status:
-		stream-end?:
+		stream-end?:		;are there more rows to be read?
 		more-results?:
 		expecting: none
 		buffer: none
@@ -702,7 +702,7 @@ make root-protocol [
 				new-line/all rows true
 			]
 		]
-		pl/expecting: none
+		if pl/stream-end? [pl/expecting: none]
 		rows
 	]
 	
@@ -1063,19 +1063,20 @@ make root-protocol [
 			]
 		]
 
-		if all [part  data <= 0] [return ret]
-
-		while [pl/more-results?] [
+		while [all [any [not part data > 0]
+					pl/more-results?]] [
 			;print ["gonna retrieve more results, expecting" pl/expecting]
 			if pl/expecting <> 'rows[
 				colnb: read-columns-number port
 				;print ["colnb: " colnb]
-				either any [zero? colnb pl/stream-end?][next?: yes][
+				next?: any [zero? colnb pl/stream-end?]
+				if not next? [
 					read-columns-headers port colnb
 				]
 			]
-			;print ["__expecting__:" pl/expecting]
-			unless next? [
+			;print ["__expecting__:" pl/expecting "next?:" next? "data:" data "stream-end?:" pl/stream-end?]
+			while [not any [next? pl/stream-end?
+							all [part data <= 0]]][
 				either all [value? 'part part][
 					tmp: read-rows/part port data
 					unless none? tmp [
@@ -1091,7 +1092,6 @@ make root-protocol [
 					]
 				]
 			]
-			if all [part  data <= 0] [return ret]
 		]
 		;print ["copy returns: " ret]
 		ret
