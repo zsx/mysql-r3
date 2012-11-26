@@ -15,6 +15,7 @@ REBOL [
         25-Jul-2001 1.7.0 "Form-sql mapped to mysql driver's 'to-sql function. -DocKimbel"
         10-Jun-2006 1.8.0 "Added 'db-extract-values function -DocKimbel"
     ]
+	GIT-ID:	"$Id$"
 ]
 
 ctx-dbms: make object! [

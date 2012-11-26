@@ -39,6 +39,7 @@ REBOL [
 		"Use window width" and set terminal width to a big value.
 		(400 should be enough for most cases)
 	}
+	GIT-ID:	"$Id$"
 ]
 
 do %mysql-protocol.r

@@ -7,6 +7,7 @@ REBOL [
 	File: %mysql-protocol.r
 	Version: 1.3.1
 	Purpose: "MySQL Driver for REBOL"
+	GIT-ID:	"$Id$"
 ]
 
 make root-protocol [
