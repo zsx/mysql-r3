@@ -134,6 +134,21 @@ make root-protocol [
 			ssl-verify-server-cert	(shift/left 1 30)
 			remember-options		(shift/left 1 31)
 		]
+
+		server-status [
+			in-trans				1 	;#01
+			autocommit				2 	;#02
+			more-results-exists		8 	;#08
+			no-good-index-used		16	;#10
+			no-index-used			32	;#20
+			cursor-exists			64	;#40
+			last-row-sent			128	;#80
+			db-dropped				256	;#100
+			no-backslash-escapes	512	;#200
+			metadata-changed		1024;#400
+			query-was-slow			2048;#800
+			ps-out-params			4096;#1000
+		]
 	]
 
 	locals-class: make object! [
@@ -521,7 +536,104 @@ make root-protocol [
 			read port buf expected - length? buf
 		]
 	]
+
+	decode-EOF-packet: func [
+		buf [any-string!]
+		capabilities [integer!]
+		/local reply rule tmp
+	][
+		assert [all [buf/-1 = #"^(FE)"
+					 8 > length? buf]]
+		print ["decode EOF packet" mold buf]
+		if zero? capabilities and defs/client/protocol-41 [
+			return none
+		]
+		reply: context [
+			warning-count: 
+			status-flags: 0
+		]
+		either parse/all buf [
+			read-int (reply/warning-count: int)
+			read-int (reply/status-flags: int)
+			end
+		][
+			reply
+		][
+			net-error "malformated error packet"
+		]
+	]
+
+	decode-ERR-packet: func [
+		buf [any-string!]
+		capabilities [integer!]
+		/local reply rule tmp
+	][
+		assert [buf/-1 = #"^(FF)"]
+		print ["decode ERR packet" mold buf]
+		reply: context [
+			error-code:	0
+			sql-state: none
+			info: ""
+		]
+		rule: []
+		unless zero? capabilities and defs/client/protocol-41 [
+			rule: [
+				"#"
+				copy tmp [5 byte-char] (reply/sql-state: tmp)
+			]
+		]
+		either parse/all buf [
+			read-int (reply/error-code: int)
+			rule
+			copy tmp to end (if value? 'tmp [reply/info: tmp])
+		][
+			reply
+		][
+			net-error "malformated error packet"
+		]
+	]
 	
+	decode-OK-packet: func [
+		buf [any-string!]
+		capabilities [integer!]
+		/local reply rule
+	][
+		print ["decode OK packet" mold buf]
+		assert [buf/-1 = #"^(00)"]
+		reply: context [
+			affected-row:
+			last-insert-id:
+			status-flags:
+			warnings:	0
+			info: ""
+		]
+
+		rule: []
+		either not zero? capabilities and defs/client/protocol-41 [
+			rule: [
+				read-int	(reply/status-flags: int)
+				read-int	(reply/warnings: int)
+			]
+		][
+			if defs/clients/transactions [
+				rule: [
+					read-int	(reply/warnings: int)
+				]
+			]
+		]
+
+		either parse/all buf [
+			read-length (reply/affected-row: len)
+			read-length (reply/last-insert-id: len)
+			rule
+			copy tmp to end (if value? 'tmp [reply/info: tmp])
+		][
+			reply
+		][
+			net-error rejoin ["malformated OK packet" mold reply]
+		]
+	]
+
 	read-packet: func [port [port!] /local packet-len pl status][
 		pl: port/locals
 		pl/stream-end?: false
@@ -551,6 +663,7 @@ make root-protocol [
 	
 		switch status [
 			255 [
+				print mold decode-ERR-packet next pl/buffer pl/capabilities
 				parse/all next pl/buffer case [
 					pl/capabilities and defs/client/protocol-41 [
 						[
@@ -570,11 +683,12 @@ make root-protocol [
 						[read-string (pl/error-msg: string)]
 					]
 				]
-				pl/stream-end?: true			
+				pl/stream-end?: true
 				pl/more-results?: false ;no more results following an error. It's not documented, but we don't have a server status word for this, so this should be a valid assumption, and it's confirmed by testing.
 				net-error reform ["ERROR" any [pl/error-code ""]":" pl/error-msg]
 			]
 			254 [
+				print mold decode-EOF-packet next pl/buffer pl/capabilities
 				case [
 					packet-len = 5 [
 						pl/more-results?: not zero? pl/buffer/4 and 8
@@ -584,6 +698,7 @@ make root-protocol [
 				]
 			]
 			0 [
+				print mold decode-OK-packet next pl/buffer pl/capabilities
 				if none? pl/expecting [
 					parse/all/case next pl/buffer [
 						read-length	(pl/matched-rows: len)
@@ -592,6 +707,9 @@ make root-protocol [
 					]
 					pl/stream-end?: true
 				]
+			]
+			251 [
+				net-error rejoin ["local in file request is unsupported"]
 			]
 		]
 		;print ["read-packet stream-end?" pl/stream-end? "more-results:" pl/more-results?]
@@ -613,7 +731,10 @@ make root-protocol [
 		pl/cache-size: pl/buf-size
 		pl/buf-size: :tmp
 		
-		read-packet port
+		print [now/precise "current buf is: " mold pl/cache " reading next packet"]
+		read-packet port ;this will not over read, because rows are always ended with an EOF packet
+						 ;once an EOF packet is seen, stream-end? will be set and this function will not be called anymore
+		print [now/precise "next packet was read^/"]
 		pl/cache
 	]
 	
@@ -626,7 +747,7 @@ make root-protocol [
 			read-int	(pl/more-results?: not zero? int and 8)
 		]
 		if not zero? colnb [pl/matched-rows: none]
-		;print ["read-columns-number returns" colnb]
+		print ["read-columns-number returns" colnb]
 		colnb
 	]
 	
@@ -693,7 +814,10 @@ make root-protocol [
 			][
 				insert*/only tail rows row
 			]
-			if pl/stream-end? or all [part n = count: count + 1][break]	; end of stream or rows # reached
+			++ count
+			if any [pl/stream-end? 
+					count >= cols
+					all [part n = count]][break]	; end of stream or rows # reached
 		]
 		if pl/auto-conv? [convert-types port rows]
 		if pl/newlines? [
