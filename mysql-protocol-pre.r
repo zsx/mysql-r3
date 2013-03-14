@@ -3,11 +3,11 @@ REBOL [
 	Authors: ["Nenad Rakocevic / SOFTINNOV" "Shixin Zeng <szeng@atronixengineering.com>"]
 	Email: mysql@softinnov.com
 	Web: http://softinnov.org/rebol/mysql.shtml
-	Date: 06/01/2012
+	Date: <DATE>
 	File: %mysql-protocol.r
 	Version: 1.3.1
 	Purpose: "MySQL Driver for REBOL"
-	GIT-ID:	"$Id$"
+	GIT-COMMIT: "<GIT-COMMIT-ID>"
 ]
 
 make root-protocol [
