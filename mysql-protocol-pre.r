@@ -888,8 +888,8 @@ make root-protocol [
 		delimiter: #";"
 		newlines?: value? 'new-line
 		last-insert-ids: make block! 1
+		matched-rows: 0
 		init:
-		matched-rows:
 		columns:
 		protocol:
 		version:
@@ -1320,7 +1320,7 @@ make root-protocol [
 			0 [
 				if none? pl/expecting [
 					parse/all/case next pl/buffer [
-						read-length	(pl/matched-rows: len)
+						read-length	(pl/matched-rows: pl/matched-rows + len)
 						read-length (if len > 0 [append pl/last-insert-ids len])
 						read-int	(pl/more-results?: not zero? int and 8)
 					]
@@ -1356,7 +1356,6 @@ make root-protocol [
 		parse/all/case read-packet port [
 			read-length (if zero? colnb: len [pl/stream-end?: true])
 		]
-		if not zero? colnb [pl/matched-rows: none]
 		;print ["read-columns-number returns" colnb]
 		colnb
 	]
@@ -1826,10 +1825,17 @@ make root-protocol [
 			]
 		]
 		;print ["copy returns: " ret]
-		if all [none? ret 
-				not empty? pl/last-insert-ids][
-			ret: copy* pl/last-insert-ids 
-			clear pl/last-insert-ids
+		if none? ret [
+			case [
+				not empty? pl/last-insert-ids [
+					ret: copy* pl/last-insert-ids 
+					clear pl/last-insert-ids
+				]
+				'else [
+					ret: pl/matched-rows
+					pl/matched-rows: 0
+				]
+			]
 		]
 		ret
 	]
