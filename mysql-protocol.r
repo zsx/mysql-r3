@@ -621,9 +621,6 @@ make root-protocol [
 		pl: port/locals
 		parse/all/case read-packet port [
 			read-length (if zero? colnb: len [pl/stream-end?: true])
-			read-length	(pl/matched-rows: len)
-			read-length 
-			read-int	(pl/more-results?: not zero? int and 8)
 		]
 		if not zero? colnb [pl/matched-rows: none]
 		;print ["read-columns-number returns" colnb]
