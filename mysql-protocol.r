@@ -154,6 +154,7 @@ make root-protocol [
 		flat?: off
 		delimiter: #";"
 		newlines?: value? 'new-line
+		last-insert-ids: make block! 1
 		init:
 		matched-rows:
 		columns:
@@ -587,7 +588,7 @@ make root-protocol [
 				if none? pl/expecting [
 					parse/all/case next pl/buffer [
 						read-length	(pl/matched-rows: len)
-						read-length
+						read-length (if len > 0 [append pl/last-insert-ids len])
 						read-int	(pl/more-results?: not zero? int and 8)
 					]
 					pl/stream-end?: true
@@ -1092,6 +1093,11 @@ make root-protocol [
 			]
 		]
 		;print ["copy returns: " ret]
+		if all [none? ret 
+				not empty? pl/last-insert-ids][
+			ret: copy* pl/last-insert-ids 
+			clear pl/last-insert-ids
+		]
 		ret
 	]
 	
