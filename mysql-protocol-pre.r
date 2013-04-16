@@ -1047,7 +1047,7 @@ make root-protocol [
 		]
 	]
 	
-	map-rebol-values: func [data [block!] /local args sql mark][
+	set 'mysql-map-rebol-values func [data [block!] /local args sql mark][
 		args: reduce next data
 		sql: copy* pick* data 1
 		mark: sql
@@ -1748,7 +1748,7 @@ make root-protocol [
 			res: either block? data [
 				if empty? data [net-error "No data!"]
 				either string? data/1 [
-					insert-query port map-rebol-values data
+					insert-query port mysql-map-rebol-values data
 				][
 					insert-cmd port data
 				]
