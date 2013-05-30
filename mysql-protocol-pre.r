@@ -1564,7 +1564,7 @@ make root-protocol [
 	try-reconnect: func [port [port!]][
 		net-log "Connection closed by server! Reconnecting..."
 		port/state/flags: port/state/flags or 1024 or 2 ; avoid triggering READ special actions + reset closed flag
-		if throws/closed = catch [open port][net-error "Server down!"]
+		open port
 	]
 	
 	check-opened: func [port [port!]][	
@@ -1743,23 +1743,21 @@ make root-protocol [
 			res: catch [insert-cmd port [ping]]
 			if any [res = throws/closed not res][try-reconnect port]
 		]
-		if throws/closed = catch [
-			if all [string? data data/1 = #"["][data: load data]
-			res: either block? data [
-				if empty? data [net-error "No data!"]
-				either string? data/1 [
-					insert-query port mysql-map-rebol-values data
-				][
-					insert-cmd port data
-				]
+		if all [string? data data/1 = #"["][data: load data]
+		res: either block? data [
+			if empty? data [net-error "No data!"]
+			either string? data/1 [
+				insert-query port mysql-map-rebol-values data
 			][
-				either port/locals/capabilities and defs/client/protocol-41 [
-					insert-query port data
-				][
-					insert-all-queries port data
-				]
+				insert-cmd port data
 			]
-		][net-error  "Connection lost - Port closed!"]
+		][
+			either port/locals/capabilities and defs/client/protocol-41 [
+				insert-query port data
+			][
+				insert-all-queries port data
+			]
+		]
 		res
 	]
 	
