@@ -743,22 +743,17 @@ mysql-errors: [
 	ER_ERROR_LAST 1727
 ]
 
-make root-protocol [
-
-	scheme: 'MySQL
-	port-id: 3306
-	port-flags: system/standard/port-flags/pass-thru or 32 ; /binary
 
 	sql-buffer: make string! 1024
 	not-squote: complement charset "'"
 	not-dquote: complement charset {"}
 
-	copy*:		get in system/words 'copy
-	insert*:	get in system/words 'insert
-	pick*:		get in system/words 'pick
-	close*:		get in system/words 'close
-	set-modes*: get in system/words 'set-modes
-	net-log: get in net-utils 'net-log	
+	copy*:		get in system/contexts/lib 'copy
+	insert*:	get in system/contexts/lib  'insert
+	pick*:		get in system/contexts/lib 'pick
+	close*:		get in system/contexts/lib 'close
+	;set-modes*: get in system/words 'set-modes
+	;net-log: get in net-utils 'net-log	
 
 	std-header-length: 4
 	std-comp-header-length:	3
@@ -862,10 +857,10 @@ make root-protocol [
 			secure-connection	32768	; use new hashing algorithm
 			multi-queries		65536	; enable/disable multiple queries support
     		multi-results		131072	; enable/disable multiple result sets
-    		ps-multi-results	(shift/left 1 18)	; multiple result sets in PS-protocol
-			plugin-auth			(shift/left 1 19) ; Client supports plugin authentication
-			ssl-verify-server-cert	(shift/left 1 30)
-			remember-options		(shift/left 1 31)
+    		ps-multi-results	(shift 1 18)	; multiple result sets in PS-protocol
+			plugin-auth			(shift 1 19) ; Client supports plugin authentication
+			ssl-verify-server-cert	(shift 1 30)
+			remember-options		(shift 1 31)
 		]
 	]
 
@@ -910,8 +905,42 @@ make root-protocol [
 		catalog: db: org_table: org_name: charsetnr: length: default: none
 	]
 	
-	my-to-date: func [v][any [attempt [to date! v] 1-jan-0000]]
-	my-to-datetime: func [v][any [attempt [to date! v] 1-jan-0000/00:00]]
+	month: [ "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul"
+		 "Aug" "Sep" "Oct" "Nov" "Dec" ]
+	my-to-date: func [v	/local mm dd yy][
+		any [
+			attempt [
+				yy: copy*/part v 4
+				mm: copy*/part skip v 5 2
+				dd: copy*/part skip v 8 2
+				either (to-integer mm) <> 0 [
+					to date! rejoin [dd "-" month/(to-integer mm) "-" yy]
+				][
+					to date! rejoin ["01-Jan-"yy]
+				]
+			] 
+			1-jan-0000
+		]
+	]
+	my-to-datetime: func [v /local mm dd yy h m][
+		any [
+			attempt [
+				yy: copy*/part v 4
+				mm: copy*/part skip v 5 2
+				dd: copy*/part skip v 8 2
+				
+				h: copy*/part skip v 11 2
+				m: copy*/part skip v 14 2
+				either (to-integer mm) <> 0 [
+					to date! rejoin [dd "-" month/(to-integer mm) "-" yy "/" h ":" m]
+				][
+					to date! rejoin ["01-Jan-" yy "/" h ":" m]
+				] 
+			]
+			1-jan-0000/00:00
+		]
+	]
+	
 	
 	conv-model: [
 		decimal			[to decimal!]
@@ -1001,7 +1030,7 @@ make root-protocol [
 
 	sql-chars: charset sql-want: {^(00)^/^-^M^(08)'"\}
 	sql-no-chars: complement sql-chars
-	escaped: make hash! [
+	escaped: make map! [
 		#"^(00)"	"\0"
 		#"^/" 		"\n"
 		#"^-" 		"\t"
@@ -1306,7 +1335,7 @@ make root-protocol [
 				]
 				pl/stream-end?: true			
 				pl/more-results?: false ;no more results following an error. It's not documented, but we don't have a server status word for this, so this should be a valid assumption, and it's confirmed by testing.
-				make error! reduce ['MySQL-errors 'message pl/error-code pl/error-msg]
+				cause-error 'Mysql-errors 'message reduce [pl/error-code pl/error-msg]
 			]
 			254 [
 				case [
