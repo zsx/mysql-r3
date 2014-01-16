@@ -1229,8 +1229,8 @@ mysql-errors: [
 	null-flag: false
 	ws: charset " ^-^M^/"
 
-	read-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
-	read-byte: [copy byte byte-char (byte: to integer! to char! :byte)]
+	read-string: [[copy string to null null(string: to-string string)] | [copy string to end(string: to-string string)]] ;null-terminated string
+	read-byte: [copy byte byte-char (byte: to integer! :byte)]
 
 	;mysql uses little endian for all integers
 	read-int: [
@@ -1265,7 +1265,7 @@ mysql-errors: [
 	read-field: [ ;length coded string
 		(null-flag: false)
 		read-length s: (either null-flag [field: none]
-			[field:	copy*/part s len s: skip s len]) :s
+			[field:	to-string copy*/part s len s: skip s len]) :s
 	]
 
 	read: func [[throw] port [port!] data [binary!] size [integer!] /local len][
