@@ -1586,336 +1586,356 @@ mysql-errors: [
 			res
 		][
 			port/locals/stream-end?: true
-			net-error reform ["Unknown command" data/1]
+			cause-error 'user 'message reform ["Unknown command" data/1]
 		]
 	]
 	
 	try-reconnect: func [port [port!]][
-		net-log "Connection closed by server! Reconnecting..."
-		port/state/flags: port/state/flags or 1024 or 2 ; avoid triggering READ special actions + reset closed flag
+		;net-log "Connection closed by server! Reconnecting..."
+		;port/state/flags: port/state/flags or 1024 or 2 ; avoid triggering READ special actions + reset closed flag
 		open port
 	]
 	
-	check-opened: func [port [port!]][	
-		if not zero? port/sub-port/state/flags and 1024 [
-			try-reconnect port
-		]
-	]
-	
-	do-handshake: func [port [port!] /local pl client-param auth-pack key err data][
-		either pl: port/locals [
-			clear pl/cache
-			clear pl/buffer
-			pl/seq-num: 0
-			pl/last-status:
-			pl/stream-end?: none
-		][
-			pl: port/locals: make locals-class []
-			pl/buffer: make binary! pl/buf-size
-			pl/cache: make binary! pl/buf-size
-			pl/conv-list: copy*/deep conv-model
-		]
+	;check-opened: func [port [port!]][	
+	;	if not zero? port/sub-port/state/flags and 1024 [
+	;		try-reconnect port
+	;	]
+	;]
+	do-handshake: func [port [port!] /local client pl client-param auth-pack key err data][
+			client: port/state/connection	
+			either pl: port/locals [
+				clear pl/cache
+				clear pl/buffer
+				pl/seq-num: 0
+				pl/last-status: none
+				pl/stream-end?: false
+			][
+				pl: port/locals: make locals-class []
+				pl/buffer: make binary! pl/buf-size
+				pl/cache: make binary! pl/buf-size
+				pl/conv-list: copy*/deep conv-model
+			]
+			
+			unless port? wait [client client/spec/timeout][
+				cause-error 'Access 'Timeout "MySQL Handshake Do Handshake Time out"
+			]
+			parse/all read-packet port [
+				read-byte 	(pl/protocol: byte)
+				read-string (pl/version: string)
+				read-long 	(pl/thread-id: long)
+				read-string	(pl/crypt-seed: string)
+				read-int	(pl/capabilities: int)
+				read-byte	(pl/character-set: byte)
+				read-int	(pl/server-status: int) 
+				read-int	(pl/capabilities: (shift int 16) or pl/capabilities)
+				read-byte	(pl/seed-length: byte)
+				10 skip		; reserved for future use
+				read-string	(
+					if string [
+						pl/crypt-seed: join copy* pl/crypt-seed string
+						pl/auth-v11: yes
+					]
+				)
+				to end		; skipping data for pre4.1.x protocols
+			]
 
-		parse/all read-packet port [
-			read-byte 	(pl/protocol: byte)
-			read-string (pl/version: string)
-			read-long 	(pl/thread-id: long)
-			read-string	(pl/crypt-seed: string)
-			read-int	(pl/capabilities: int)
-			read-byte	(pl/character-set: byte)
-			read-int	(pl/server-status: int) 
-			read-int	(pl/capabilities: (shift/left int 16) or pl/capabilities)
-			read-byte	(pl/seed-length: byte)
-			10 skip		; reserved for future use
-			read-string	(
-				if string [
-					pl/crypt-seed: join copy* pl/crypt-seed string
-					pl/auth-v11: yes
+			if pl/protocol = -1 [
+				close* client
+				cause-error 'user 'message "Server configuration denies access to locals source^/Port closed!"
+			]
+
+			show-server pl
+
+			feature-supported?: func ['feature] [
+				(select defs/client feature) and pl/capabilities
+			]
+
+			client-param: defs/client/found-rows or defs/client/connect-with-db
+			client-param: either pl/capabilities and defs/client/protocol-41 [
+				client-param 
+				or defs/client/long-password 
+				or defs/client/transactions 
+				or defs/client/protocol-41
+				or defs/client/secure-connection
+				or defs/client/multi-queries
+				or defs/client/multi-results
+			][
+				client-param and complement defs/client/long-password
+			]
+			
+			auth-pack: either pl/capabilities and defs/client/protocol-41 [
+				rejoin [
+					write-long client-param
+					;write-long (length? port/user) + (length? port/pass)
+					;	+ 7 + std-header-length
+					write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
+					write-byte pl/character-set
+					{^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@} ;23 0's
+					write-string port/spec/user
+					write-byte length? key: scramble port/spec/pass port
+					key
+					write-string any [(skip port/spec/path 1) "^@"]
 				]
-			)
-			to end		; skipping data for pre4.1.x protocols
-		]
-
-		if pl/protocol = -1 [
-			close* port/sub-port
-			net-error "Server configuration denies access to locals source^/Port closed!"
-		]
-
-		show-server pl
-
-		feature-supported?: func ['feature] [
-			(select defs/client feature) and pl/capabilities
-		]
-
-		client-param: defs/client/found-rows or defs/client/connect-with-db
-		client-param: either pl/capabilities and defs/client/protocol-41 [
-			client-param 
-			or feature-supported? long-password 
-			or feature-supported? transactions 
-			or feature-supported? protocol-41
-			or feature-supported? secure-connection
-			or feature-supported? multi-queries
-			or feature-supported? multi-results
-		][
-			client-param and complement defs/client/long-password
-		]
-		auth-pack: either pl/capabilities and defs/client/protocol-41 [
-			rejoin [
-				write-long client-param
-				;write-long (length? port/user) + (length? port/pass)
-				;	+ 7 + std-header-length
-				write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
-				write-byte pl/character-set
-				{^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@} ;23 0's
-				write-string port/user
-				write-byte length? key: scramble port/pass port
-				key
-				write-string any [port/path "^@"]
+			][
+				rejoin [
+					write-int client-param
+					write-int24 (length? port/spec/user) + (length? port/spec/pass)
+						+ 7 + std-header-length
+					write-string port/spec/user
+					write-string key: scramble port/pass port
+					write-string any [(skip port/spec/path 1) ""]
+				]
 			]
-		][
-			rejoin [
-				write-int client-param
-				write-int24 (length? port/user) + (length? port/pass)
-					+ 7 + std-header-length
-				write-string port/user
-				write-string key: scramble port/pass port
-				write-string any [port/path ""]
+			send-packet port auth-pack
+			
+			either error? set/any 'err try [data: read-packet port][
+				print err
+				any [all [find key #{00} pl/error-code] err]	; -- detect the flaw in the protocol
+			][
+				if all [1 = length? data data/1 = #"^(FE)"][
+					send-packet port write-string scramble/v10 port/pass port
+					read-packet port		
+				]
+				print "Connected to server. Handshake OK"
+				none
 			]
-		]
-		send-packet port auth-pack
-	
-		either error? set/any 'err try [data: read-packet port][
-			any [all [find key #{00} pl/error-code] err]	; -- detect the flaw in the protocol
-		][
-			if all [1 = length? data data/1 = #"^(FE)"][
-				net-log "Switching to old password mode!"
-				send-packet port write-string scramble/v10 port/pass port
-				read-packet port		
-			]
-			net-log "Connected to server. Handshake OK"
-			none
-		]
-	]
+		];end hand shake	
+
 	
 ;------ Public interface ------
-
-	init: func [port [port!] spec /local scheme args][
-		if url? spec [net-utils/url-parser/parse-url port spec] 
-		scheme: port/scheme 
-		port/url: spec 
-		if none? port/host [
-			net-error reform ["No network server for" scheme "is specified"]
-		] 
-		if none? port/port-id [
-			net-error reform ["No port address for" scheme "is specified"]
-		]
-		if all [none? port/path port/target][
-			port/path: port/target
-			port/target: none
-		]
-		if all [port/path slash = last port/path][
-			remove back tail port/path
-		]
-		if none? port/user [port/user: make string! 0]
-		if none? port/pass [port/pass: make string! 0]
-		if port/pass = "?" [port/pass: ask/hide "Password: "]
-	]
-
-	open: func [port [port!] /local retry q sql][	
-		retry: 10
-		until [
-			open-proto port   
-			set-modes* port/sub-port [keep-alive: true]
-			port/sub-port/state/flags: 524835	; force /direct/binary mode
-			retry: retry - 1
-			if res: do-handshake port [close* port/sub-port]
-			any [none? res zero? retry]
-		]
-		if zero? retry [net-error "Cannot handshake with server"]
-		port/locals/stream-end?: true	; force stream-end, so 'copy won't timeout !
-		if zero? port/state/flags and 2 [
-			either sql: port/state/custom [
-				if not string? sql: first sql [net-error "invalid query"]
-				insert port sql
-			][
-				insert port either port/target [
-					join "DESC " port/target
-				][
-					port/locals/flat?: on
-					join "SHOW " pick* ["DATABASES" "TABLES"] not port/path
-				]
-			]
-		]
-		port/state/tail: 10		; for 'pick to work properly
-		if q: port/locals/init [
-			net-log ["Sending init string :" q]
-			insert port q
-		]
-	]
-
-	close: func [port [port!]][
-		port/sub-port/timeout: 4
-		either error? try [
-			flush-pending-data port
-			send-cmd port defs/cmd/quit []
-		][net-log "Error on closing port!"][net-log "Close ok."]
-		port/state/flags: 1024
-		close* port/sub-port
+	clear-data: func [ port ][
+		clear port/state/connection/data
+		;port/state/connection/spec/response: make binary! 0
 	]
 	
-	insert: func [[throw] port [port!] data [string! block!] /local res][
-		check-opened port
-		flush-pending-data port
-		port/locals/columns: none
-		if all [port/locals/auto-ping? data <> [ping]][
-			net-log "sending ping..."
-			res: catch [insert-cmd port [ping]]
-			if any [res = throws/closed not res][try-reconnect port]
-		]
-		if all [string? data data/1 = #"["][data: load data]
-		res: either block? data [
-			if empty? data [net-error "No data!"]
-			either string? data/1 [
-				insert-query port mysql-map-rebol-values data
-			][
-				insert-cmd port data
-			]
-		][
-			either port/locals/capabilities and defs/client/protocol-41 [
-				insert-query port data
-			][
-				insert-all-queries port data
-			]
-		]
-		res
-	]
-	
-	pick: func [port [port!] data][
-		either any [none? data data = 1][
-			either port/locals/stream-end? [copy* []][copy/part port 1]
-		][none]
-	]
-
-	copy: func [port /part data [integer!] /local pl colnb exit? ret tmp][
-		;print ["copy from the port, expecting:" port/locals/expecting]
-		check-opened port
-		pl: port/locals
-		ret: none
-		next?: false
-		
-		if all [not pl/stream-end?
-				pl/expecting = 'rows] [
-			either all [value? 'part part][
-				tmp: read-rows/part port data
-				unless none? tmp [
-					if none? ret [ret: copy* []]
-					append ret tmp
-					data: data - length? tmp
-				]
-			][
-				tmp: read-rows port
-				unless none? tmp [
-					if none? ret [ret: copy* []]
-					append ret tmp
-				]
-			]
-		]
-
-		while [all [any [not part data > 0]
-					pl/more-results?]] [
-			;print ["gonna retrieve more results, expecting" pl/expecting]
-			if pl/expecting <> 'rows[
-				colnb: read-columns-number port
-				;print ["colnb: " colnb]
-				next?: any [zero? colnb pl/stream-end?]
-				if not next? [
-					read-columns-headers port colnb
-				]
-			]
-			;print ["__expecting__:" pl/expecting "next?:" next? "data:" data "stream-end?:" pl/stream-end?]
-			while [not any [next? pl/stream-end?
-							all [part data <= 0]]][
-				either all [value? 'part part][
-					tmp: read-rows/part port data
-					unless none? tmp [
-						if none? ret [ret: copy* []]
-						append ret tmp
-						data: data - length? tmp
-					]
-				][
-					tmp: read-rows port
-					unless none? tmp [
-						if none? ret [ret: copy* []]
-						append ret tmp
-					]
-				]
-			]
-		]
-		;print ["copy returns: " ret]
-		if none? ret [
-			case [
-				not empty? pl/last-insert-ids [
-					ret: copy* pl/last-insert-ids 
-					clear pl/last-insert-ids
-				]
-				'else [
-					ret: pl/matched-rows
-					pl/matched-rows: 0
-				]
-			]
-		]
-		ret
-	]
-	
-	set 'send-sql func [
+	send-sql: func [
 		[throw catch]
 		db [port!] data [string! block!]
-		/flat /raw /named /local result pl
+		/flat /raw /named /local result pl client
 	][
+		client: db/state/connection
 		pl: db/locals
 		pl/flat?: to logic! flat
 		pl/auto-conv?: not to logic! raw
-		result: any [
-			insert db data
-			copy db
+		if throws/closed = catch [
+			result: any [
+				db/actor/insert db data
+				db/actor/copy db
+			]
+		][
+			db/actor/open db
+			result: any [
+				db/actor/insert db data
+				db/actor/copy db
+			]
 		]
 		if flat [pl/flat?: off]
 		if raw  [pl/auto-conv?: on]
 		either all [named block? result not empty? result][
 			either flat [
 				if greater? length? result length? pl/columns [
-					make error! "/flat and /named not allowed in this case!"
+					cause-error 'user 'message "/flat and /named not allowed in this case!"
 				]
 				name-fields db result
 			][
-				forall result [change/only result name-fields db first result]
+				forall result [change/only result db/actor/name-fields db first result]
 				head result
 			]
 		][
 			result
 		]
 	]
-	
-	set 'name-fields func [db [port!] record [block!] /local out cols][
-		out: make block! 2 * length? record
-		cols: db/locals/columns
-		repeat n length? record [
-			insert* tail out to word! cols/:n/name
-			insert* tail out record/:n
-		]
-		out
-	]
-
-	;--- Register ourselves. 
-	net-utils/net-install MySQL self 3306
-
-	;insert a new error type
-	system/error: make system/error [
-		MySQL-errors: make object! [;arg1: [error code]; arg2: error message]
-			code: 3000
-			type: "MySQL errors"
+	system/catalog/errors: make  system/catalog/errors[
+		MySQL-errors: make object! [;arg1: [error code] ;arg2: error message]
+			code: 1000
+			type: "MySQL-errors"
 			message: ["Error (" :arg1 ")" :arg2]
 		]
+	]; end system catalog errors --------------
+sys/make-scheme [
+	name: 'mysql
+	title: " Mysql Driver "
+	
+	spec: make system/standard/port-spec-net [
+		path: %
+		port-id: 3306
+		timeout: 60
+		user:
+		pass: none
 	]
-]
+	
+	info: make system/standard/file-info [
+	]
+	
+	awake: func [event /local client][
+		client: event/port
+		switch event/type [
+			error [true]
+			lookup [
+				;print "loop up"
+				open client
+			]
+			connect [
+				;print "connect"
+				return true
+			]
+			read[
+				;print "read event"
+				return true
+			]
+			wrote[
+				;print "write event"
+				return true
+			]
+			close [
+				return true
+			]
+		]
+		false
+	];-----------end awake --------------
+	actor: [
+		; ------------- new open ---------
+			open: func [port[port! url!] /local cnn pl client-param auth-pack key err data][	
+			    ;print " new open function "
+				if port/state [close port]
+				if none? port/spec/host [http-error "Missing host address"]
+				;set the port state
+				port/state: context[
+					path: %/
+					state:
+					connection:
+					error:
+					awake: none
+					close?: no
+					timeout: 60
+				]
+				;create the tcp port and set it to port/state/connection
+				port/state/connection: conn: make port![
+					scheme: 'tcp
+					host: port/spec/host
+					port-id: port/spec/port-id
+					ref: rejoin [tcp:// host ":" port-id]
+					user: port/spec/user
+					pass: port/spec/pass
+					path: port/spec/path
+					timeout: 60
+				]
+				
+				conn/awake: :awake    		
+				open conn
+                clear-data port
+				do-handshake port
+				
+				return port
+			]
+		
+		open?: func [port [port!]][
+			all [port/state]
+		]
+
+		close: func [port [port!] /local client][
+			client: port/state/connection
+			client/spec/timeout: 4
+			if open? client[
+				either error? try [
+					flush-pending-data port
+					send-cmd port defs/cmd/quit []
+				][print "error on closing port!"][print "close ok"]
+				close* client
+			]
+			client/awake: none
+			port/state: none
+		]
+
+		insert: func [[throw] port [port!] data [string! block!] /local client res][
+			client: port/state/connection
+			if not open? client [
+				if throws/closed = catch [
+					port/actor/open port
+				][
+					print "server down"
+				]
+			]
+			
+			if throws/closed = catch [
+				flush-pending-data port
+			][
+				throw throws/closed
+			]
+			port/locals/columns: none
+			
+			if all [port/locals/auto-ping? data <> [ping]][
+				clear-data port
+				res: catch [insert-cmd port [ping]]
+				if any [res = throws/closed not res][
+					throw throws/closed
+				]
+			]
+			
+			clear-data port
+			if throws/closed = catch [
+				if all [string? data data/1 = #"["][data: load data]
+				res: either block? data [
+					if empty? data [cause-error 'user 'message "No data!"]
+					either string? data/1 [
+						insert-query port mysql-map-rebol-values data
+					][
+						insert-cmd port data
+					]
+				][
+					either port/locals/capabilities and defs/client/protocol-41[
+						insert-query port data
+					][
+						insert-all-queries port data
+					]
+				]			 
+			][print "connection lost - Port closed!"]
+			res
+			
+		]; end insert function
+		
+		pick: func [port [port!] data /local client][
+			client: port/state/connection
+			either any [none? data data = 1][
+				either port/locals/stream-end? [copy* []][copy* port 1]
+			]
+		];end pick func
+		
+		copy: func [port[port!] /part data [integer!] /local client pl colnb exit?][
+			client: port/state/connection
+			if not open? client [
+				port/action/open port
+			]
+			pl: port/locals
+			;probe pl
+			;print port/locals/more-results?
+			either any [pl/more-results? not pl/stream-end?][
+				if all [pl/more-results? pl/expecting <> 'rows][
+					colnb: read-columns-number client
+					either any [zero? colnb pl/stream-end?][exit?: yes][
+						read-columns-headers client colnb
+					]
+				]
+				either exit? [none] [
+					either all [value? 'part part][
+						read-rows/part port data
+					][
+						read-rows port
+					]
+				]
+			][none]
+		]; end copy
+		
+		name-fields: func [db [port!] record [block!] /local out cols][
+			out: make block! 2 * length? record
+			cols: db/locals/columns
+			repeat n length? record [
+				insert* tail out (to-word to-string cols/:n/name)
+				insert* tail out record/1/:n
+			]
+			out
+		]; end name-fields
+
+	]; end actor
+]; end sys/make-scheme
 
