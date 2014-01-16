@@ -1197,10 +1197,10 @@ mysql-errors: [
 		]
 		
 		;--- New 4.1.0+ authentication scheme ---
-		crypt-v11: func [data [string!] seed [string!] /local key1 key2][
+		crypt-v11: func [data [binary!] seed [binary!] /local key1 key2][
 			key1: checksum/secure data
 			key2: checksum/secure key1
-			to string! key1 xor checksum/secure join seed key2
+			key1 xor checksum/secure rejoin [(to-binary seed) key2]
 		]
 		
 		scramble: func [data [string!] port [port!] /v10 /local seed][
@@ -1209,7 +1209,7 @@ mysql-errors: [
 			if v10 [return crypt-v10 data copy*/part seed 8]
 			either port/locals/protocol > 9 [
 				either port/locals/auth-v11 [
-					crypt-v11 data seed
+					crypt-v11 to-binary data to-binary seed
 				][
 					crypt-v10 data seed
 				]
