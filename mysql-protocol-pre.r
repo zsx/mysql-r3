@@ -1493,39 +1493,45 @@ mysql-errors: [
 
 ;------ Data sending ------
 
-	write-byte: func [value [integer!]][to char! value]
+	write-byte: func [value [integer!]][
+		b: skip to binary! value 7
+	]
 	
 	write-int: func [value [integer!]][
-		join to char! value // 256 to char! value / 256
+		join write-byte value // 256 write-byte value / 256
 	]
 
 	write-int24: func [value [integer!]][
-		join to char! value // 256 [
-			to char! (to integer! value / 256) and 255
-			to char! (to integer! value / 65536) and 255
+		join write-byte value // 256 [
+			write-byte (to integer! value / 256) and 255
+			write-byte (to integer! value / 65536) and 255
 		]
 	]
 
 	write-long: func [value [integer!]][
-		join to char! value // 256 [
-			to char! (to integer! value / 256) and 255
-			to char! (to integer! value / 65536) and 255
-			to char! (to integer! value / 16777216) and 255
+		join write-byte value // 256 [
+			write-byte (to integer! value / 256) and 255
+			write-byte (to integer! value / 65536) and 255
+			write-byte (to integer! value / 16777216) and 255
 		]
 	]
 
-	write-string: func [value [string!]][
-		join value to char! 0
+	write-string: func [value [string!] /local t][
+		to-binary join value to char! 0
 	]
-
-	send-packet: func [port [port!] data [string!]][
-		data: to-binary rejoin [
+	
+	send-packet: func [port [port!] data [binary!] /local client][
+		client: port/state/connection
+		data: rejoin [
 			write-int24 length? data
 			write-byte port/locals/seq-num: port/locals/seq-num + 1
 			data
 		]
-		if 0 >= write-io port/sub-port data length? data [
-			throw throws/closed
+		;print ["write function port state " open? client]
+		if not open? client [open client]
+		write client data
+		unless port? wait [client client/spec/timeout][
+			cause-error 'access 'timeout " cannot write(send-packet func) to MySQL server"
 		]
 		port/locals/stream-end?: false
 	]
