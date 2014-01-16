@@ -1268,11 +1268,18 @@ mysql-errors: [
 			[field:	to-string copy*/part s len s: skip s len]) :s
 	]
 
-	read: func [[throw] port [port!] data [binary!] size [integer!] /local len][
-		len: read-io port/sub-port data size 
-		if any [zero? len negative? len][
-			close* port/sub-port			
-			throw throws/closed
+	read-io: func [[throw] port [port!]size [integer!] /local client len][
+		;print "------- function read-io ------ "
+		client: port/state/connection
+		if any [none? client/data size > (length? client/data) ][
+			read client
+			unless port? wait[client client/spec/timeout] [
+				cause-error 'access 'timeout "cannot read from MySQL server"
+			]
+			if any [zero? length? client/data negative? length? client/data][
+				close* client
+				throw throws/closed
+			]
 		]
 		net-log reform ["low level read of" len "bytes"] 
 		len
