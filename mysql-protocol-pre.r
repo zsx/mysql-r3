@@ -743,6 +743,7 @@ mysql-errors: [
 	ER_ERROR_LAST 1727
 ]
 
+mysql-driver: make object![
 
 	sql-buffer: make string! 1024
 	not-squote: complement charset "'"
@@ -1952,3 +1953,4 @@ sys/make-scheme [
 	]; end actor
 ]; end sys/make-scheme
 
+send-sql: get in mysql-driver 'send-sql
