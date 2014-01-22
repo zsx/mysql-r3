@@ -1272,7 +1272,7 @@ mysql-driver: make object![
 	read-io: func [[throw] port [port!]size [integer!] /local client len][
 		;print "------- function read-io ------ "
 		client: port/state/connection
-		if any [none? client/data size > (length? client/data) ][
+		while [any [none? client/data size > (length? client/data)]][
 			read client
 			unless port? wait[client client/spec/timeout] [
 				cause-error 'access 'timeout "cannot read from MySQL server"
@@ -1284,12 +1284,12 @@ mysql-driver: make object![
 		]
 		net-log reform ["low level read of" len "bytes"] 
 		len
-	]
-
-	defrag-read: func [port [port!] buf [binary!] expected [integer!]][
-		clear buf
-		while [expected > length? buf][
-			read port buf expected - length? buf
+	]; end read
+	
+	defrag-read: func [port [port!] expected [integer!]][
+		clear port/locals/buffer
+		if expected > (length? port/locals/buffer) [
+			read-io port expected - length? port/locals/buffer
 		]
 	]
 	
