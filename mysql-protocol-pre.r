@@ -1587,7 +1587,7 @@ make root-protocol [
 			pl/conv-list: copy*/deep conv-model
 		]
 
-		parse/all read-packet port [
+		unless parse/all read-packet port [
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
@@ -1605,6 +1605,8 @@ make root-protocol [
 				]
 			)
 			to end		; skipping data for pre4.1.x protocols
+		][
+			make error! rejoin ["failed to parse the greeting from the server:" mold pl/buffer "," mold pl]
 		]
 
 		if pl/protocol = -1 [
