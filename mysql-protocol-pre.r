@@ -5,7 +5,7 @@ REBOL [
 	Web: http://softinnov.org/rebol/mysql.shtml
 	Date: <DATE>
 	File: %mysql-protocol.r
-	Version: 1.3.1
+	Version: 2.0.0
 	Purpose: "MySQL Driver for REBOL"
 	GIT-COMMIT: "<GIT-COMMIT-ID>"
 ]
