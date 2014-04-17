@@ -2077,6 +2077,7 @@ sys/make-scheme [
 	
 	awake: func [
 		event [event!]
+		/local pl cb
 	][
 		;print ["mysql port event:" event/type]
 		pl: event/port/locals
