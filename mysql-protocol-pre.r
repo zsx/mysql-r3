@@ -2107,6 +2107,9 @@ sys/make-scheme [
 								;print ["a block callback:" mold cb]
 								do cb
 							]
+							none? cb [
+								;ignored
+							]
 							'else [
 								cause-error 'user 'message reduce [rejoin ["unsupported callback:" mold cb]]
 							]
@@ -2220,7 +2223,7 @@ send-sql: func [
 	/flat "return a flatten block"
 	/raw "do not do type conversion"
 	/named
-	/async cb [word! function! block!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
+	/async cb [word! function! block! none!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
 	/verbose "return detailed info"
 	/local result pl old-handshaked?
 ][
