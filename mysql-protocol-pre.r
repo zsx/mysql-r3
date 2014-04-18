@@ -874,7 +874,6 @@ mysql-driver: make object![
 		stream-end?:		;are there more rows to be read?
 		more-results?: false
 		expecting: none
-		buffer: none
 		packet-len: 0
 		last-activity: now/precise
 		next-packet-length: 0
@@ -1422,12 +1421,12 @@ mysql-driver: make object![
 	][
 		pl: port/locals
 
-		pl/last-status: status: to integer! pl/buffer/1
+		pl/last-status: status: to integer! port/data/1
 		pl/error-code: pl/error-msg: none
 
 		switch status [
 			255 [
-				parse/all next pl/buffer case [
+				parse/all next port/data case [
 					pl/capabilities and defs/client/protocol-41 [
 						[
 							read-int 	(pl/error-code: int)
@@ -1452,7 +1451,7 @@ mysql-driver: make object![
 			254 [
 				if pl/packet-len < 9 [
 					if pl/packet-len = 5 [
-						parse/all/case next pl/buffer [
+						parse/all/case next port/data [
 							read-int	(pl/current-result/warnings: int)
 							read-int	(pl/more-results?: not zero? int and 8)
 						]
@@ -1474,7 +1473,7 @@ mysql-driver: make object![
 						]
 					]
 					; ignore session track info
-					parse/all/case next pl/buffer rules
+					parse/all/case next port/data rules
 				]
 				return 'OK
 			]
@@ -1537,7 +1536,7 @@ mysql-driver: make object![
 			]
 
 			reading-auth-resp [
-				either all [1 = length? pl/buffer pl/buffer/1 = #"^(FE)"][
+				either all [1 = length? port/data port/data/1 = #"^(FE)"][
 					;switch to old password mode
 					send-packet port write-string scramble/v10 port/pass port
 					pl/status: 'sending-old-auth-pack
@@ -1552,7 +1551,7 @@ mysql-driver: make object![
 			]
 
 			reading-old-auth-resp [
-				if pl/buffer/1 = #"^(00)"[
+				if port/data/1 = #"^(00)"[
 					emit-event port 'connect
 
 					;debug ["o-buf after old auth resp:" mold port/locals/o-buf]
@@ -1570,7 +1569,7 @@ mysql-driver: make object![
 						case [
 							any [pl/current-cmd = defs/cmd/query
 								pl/current-cmd = defs/cmd/field-list][
-								parse/all/case pl/buffer [
+								parse/all/case port/data [
 									read-length (if zero? pl/current-result/n-columns: len [
 											pl/stream-end?: true 
 											debug ["stream ended because of 0 columns"]
@@ -1603,7 +1602,7 @@ mysql-driver: make object![
 					OTHER [
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
-							parse/all/case pl/buffer [
+							parse/all/case port/data [
 								read-field 	(col/catalog: field)
 								read-field 	(col/db: field)
 								read-field	(col/table:	field)
@@ -1620,7 +1619,7 @@ mysql-driver: make object![
 								read-length	(col/default: len)
 							]
 						][
-							parse/all/case pl/buffer [
+							parse/all/case port/data [
 								read-field	(col/table:	field)
 								read-field	(col/name: 	field)
 								read-length	(col/length: len)
@@ -1659,16 +1658,15 @@ mysql-driver: make object![
 				pl/stream-end?: false
 				pl/status: 'reading-packet-head
 				pl/next-packet-length: std-header-length
-				;;print ["columns:" mold pl/columns]
 			]
 
 			reading-rows [
 				switch/default parse-a-packet port [
 					OTHER [
 						row: make block! pl/current-result/n-columns
-						;print ["row buf:" pl/buffer]
-						parse/all/case pl/buffer [pl/current-result/n-columns [read-field (append row field)]]
-						;print ["row:" mold row]
+						debug ["row buf:" copy/part port/data pl/next-packet-length]
+						parse/all/case port/data [pl/current-result/n-columns [read-field (append row field)]]
+						debug ["row:" mold row]
 						if none? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
 						]
@@ -1731,7 +1729,7 @@ mysql-driver: make object![
 		debug ["processing a greeting packet"]
 		tcp-port: port
 		pl: port/locals
-		parse/all pl/buffer [
+		parse/all port/data [
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
@@ -1849,17 +1847,15 @@ mysql-driver: make object![
 				pl/status: 'reading-packet-head ;temporary switch status
 			]
 			read [
-				;;print "read event"
-				if none? pl/buffer [
-					pl/buffer: make binary! 1024
-				]
-				;print ["buffer:" mold pl/buffer "data" mold tcp-port/data]
-				append pl/buffer tcp-port/data
-				;print ["buffer with data:" mold pl/buffer]
+				;;debug "read event"
+				;debug ["buffer:" mold tcp-port/data]
+				debug ["current buffer length:" length? tcp-port/data ", data length:" length? tcp-port/data]
+				debug ["after adding data, length of buffer:" length? tcp-port/data]
+				;debug ["buffer with data:" mold tcp-port/data]
 				pl/stream-end?: true
 				while [true] [
-					;print ["next-len:" pl/next-packet-length ", buf: " length? pl/buffer]
-					either pl/next-packet-length > length? pl/buffer [; not enough data
+					debug ["next-len:" pl/next-packet-length ", buf: " length? tcp-port/data]
+					either pl/next-packet-length > length? tcp-port/data [; not enough data
 						read tcp-port
 						;debug ["keep reading"]
 						break
@@ -1867,20 +1863,21 @@ mysql-driver: make object![
 						debug ["current status:" pl/status]
 						switch/default pl/status [
 							reading-packet-head [
-								;print ["read a packet head" mold copy/part pl/buffer std-header-length]
-								parse/all pl/buffer [
+								debug ["read a packet head" mold copy/part tcp-port/data std-header-length]
+								parse/all tcp-port/data [
 									read-int24  (pl/packet-len: int24)
 									read-byte	(pl/seq-num: byte)
 								]
 								pl/status: 'reading-packet
 								pl/next-packet-length: pl/packet-len
-								remove/part pl/buffer std-header-length
+								remove/part tcp-port/data std-header-length
+								debug ["expected length of next packet:" pl/next-packet-length]
 							]
 							reading-packet [
 								debug ["read a packet"]
 								pl/status: pl/saved-status
 								process-a-packet tcp-port ;restore the status back to what it was
-								remove/part pl/buffer pl/packet-len
+								remove/part tcp-port/data pl/packet-len
 								if pl/stream-end? [
 									;debug ["stream ended, exiting"]
 									break
