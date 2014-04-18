@@ -2193,7 +2193,7 @@ sys/make-scheme [
 			tcp-port: pl/tcp-port
 			options: data/1
 			either object? options [
-				either none? :options/async? [
+				either all [logic? :options/async? not :options/async?][
 					append pl/pending-requests reduce ['sync none]
 				][
 					if options/named? [
@@ -2245,7 +2245,7 @@ send-sql: func [
 		auto-conv?: not to logic! raw
 		named?: to logic! named
 		verbose?: to logic! verbose
-		async?: :cb
+		async?: either async [:cb][off]
 	]
 
 	insert port data
