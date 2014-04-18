@@ -2106,8 +2106,8 @@ sys/make-scheme [
 								;debug ["a function callback:" mold :cb]
 								cb event/port/data
 							]
-							word? cb [
-								;print ["a word callback:" mold cb]
+							any [word? cb path? cb][
+								debug ["a word/path callback:" mold cb]
 								set cb event/port/data
 							]
 							block? cb [
@@ -2231,7 +2231,7 @@ send-sql: func [
 	/flat "return a flatten block"
 	/raw "do not do type conversion"
 	/named
-	/async cb [word! function! block! none!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
+	/async cb [word! path! function! block! none!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
 	/verbose "return detailed info"
 	/local result pl old-handshaked?
 ][
