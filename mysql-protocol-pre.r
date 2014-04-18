@@ -1524,6 +1524,7 @@ mysql-driver: make object![
 		pl
 		col
 		mysql-port
+		pkt-type
 	][
 		pl: port/locals
 		mysql-port: pl/mysql-port
@@ -1598,7 +1599,11 @@ mysql-driver: make object![
 			]
 
 			reading-fields [
-				switch/default parse-a-packet port [
+				pkt-type: 'OTHER
+				if 0 != to integer! first port/data [; string with a length of 0, will be confused as an OK packet
+					pkt-type: parse-a-packet port
+				]
+				switch/default pkt-type [
 					OTHER [
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
@@ -1661,7 +1666,11 @@ mysql-driver: make object![
 			]
 
 			reading-rows [
-				switch/default parse-a-packet port [
+				pkt-type: 'OTHER
+				if 0 != to integer! first port/data [; string with a length of 0, will be confused as an OK packet
+					pkt-type: parse-a-packet port
+				]
+				switch/default pkt-type [
 					OTHER [
 						row: make block! pl/current-result/n-columns
 						debug ["row buf:" copy/part port/data pl/next-packet-length]
