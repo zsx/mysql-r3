@@ -1841,7 +1841,7 @@ mysql-driver: make object![
 		;pl/exit-wait?: false
 		switch event/type [
 			error [
-				cause-error 'user 'message ["error"]
+				cause-error 'Access 'read-error reduce [event/port "unknown" event]
 				return true
 			]
 			lookup [
