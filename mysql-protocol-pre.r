@@ -2264,7 +2264,14 @@ send-sql: func [
 		;debug ["handshaked?:" pl/handshaked?]
 		old-handshaked?: pl/handshaked?
 		while [pl/last-activity + port/spec/timeout >= now/precise][
-			either port? wait [port port/spec/timeout][ ;will not return unless: 1) handshaked, 2) sync request processed, or 3) error
+			either port? either all [
+				system/product = 'atronix-view
+				any [0 < second system/version 0 < third system/version]
+				][
+					wait/only [port port/locals/tcp-port port/spec/timeout] ;/only refinement is an atronix enhancement after 3.0.90
+				][
+					wait [port port/spec/timeout]
+				][ ;will not return unless: 1) handshaked, 2) sync request processed, or 3) error
 				;assert [empty? pl/pending-requests]
 				debug ["port/data:" mold port/data]
 				return port/data
