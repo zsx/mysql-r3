@@ -967,33 +967,33 @@ mysql-driver: make object![
 	
 	
 	conv-model: [
-		decimal			[to decimal!]
-		tiny			[to integer!]
-		short			[to integer!]
-		long			[to integer!]
-		float			[to decimal!]
-		double			none
-		null			none
-		timestamp		none
-		longlong		none
-		int24			[to integer!]
-		date			[my-to-date]
-		time			[to time!]
-		datetime		[my-to-datetime]
-		year			[to integer!]
-		newdate			none
-		var-char		none
+		decimal			[to decimal! to string!]
+		tiny			[to integer! to string!]
+		short			[to integer! to string!]
+		long			[to integer! to string!]
+		float			[to decimal! to string!]
+		double			[to decimal! to string!]
+		null			[to string!]
+		timestamp		[to string!]
+		longlong		[to integer! to string!]
+		int24			[to integer! to string!]
+		date			[my-to-date to string!]
+		time			[to time! to string!]
+		datetime		[my-to-datetime to string!]
+		year			[to integer! to string!]
+		newdate			[to string!]
+		var-char		[to string!]
 		bit				none
-		new-decimal		[to decimal!]
-		enum			none
-		set				none
+		new-decimal		[to decimal! to string!]
+		enum			[to string!]
+		set				[to string!]
 		tiny-blob		none
 		medium-blob		none
 		long-blob		none
 		blob			none
-		var-string		none
-		string			none
-		geometry		none
+		var-string		[to string!]
+		string			[to string!]
+		geometry		[to string!]
 	]
 	
 	set 'change-type-handler func [p [port!] type [word!] blk [block!]][
@@ -1292,7 +1292,7 @@ mysql-driver: make object![
 	read-field: [ ;length coded string
 		(null-flag: false)
 		read-length s: (either null-flag [field: none]
-			[field:	to-string copy*/part s len s: skip s len]) :s
+			[field:	copy*/part s len s: skip s len]) :s
 	]
 	
 	read-cmd: func [port [port!] cmd [integer!] /local res][
