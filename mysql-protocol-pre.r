@@ -994,6 +994,10 @@ mysql-driver: make object![
 		medium-blob		none
 		long-blob		none
 		blob			none
+		tiny-text		[to string!]
+		medium-text		[to string!]
+		long-text		[to string!]
+		text			[to string!]
 		var-string		[to string!]
 		string			[to string!]
 		geometry		[to string!]
@@ -1528,6 +1532,8 @@ mysql-driver: make object![
 		col
 		mysql-port
 		pkt-type
+		blob-to-text
+		text-type
 	][
 		pl: port/locals
 		mysql-port: pl/mysql-port
@@ -1635,6 +1641,12 @@ mysql-driver: make object![
 								read-length	(col/type: decode/type len)
 								read-length	(col/flags: decode/flags len)
 								read-byte	(col/decimals: byte)
+							]
+						]
+						blob-to-text: [blob text tinyblob tinytext mediumblob mediumtext longblob longtext]
+						unless none? text-type: select blob-to-text col/type [
+							unless found? find col/flags 'binary [
+								col/type: text-type
 							]
 						]
 						if none? pl/current-result/columns [
