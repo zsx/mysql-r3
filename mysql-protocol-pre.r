@@ -885,6 +885,7 @@ mysql-driver: make object![
 		results: copy [] ;all result sets in current send-sql, there could be multiple results if more queries were sent in one call
 		result-options: none
 		current-cmd-data: none
+		query-start-time: none
 	;-------
 		auto-commit: on		; not used, just reserved for /Command compatibility.
 		delimiter: #";"
@@ -907,6 +908,8 @@ mysql-driver: make object![
 	]
 
 	result-class: make object! [
+		query-start-time: 0
+		query-finish-time: 0
 		n-columns:
 		affected-rows:
 		warnings: 0
@@ -1585,6 +1588,7 @@ mysql-driver: make object![
 					]
 					OK [;other cmd response
 						pl/stream-end?: true
+						pl/current-result/query-finish-time: now/precise
 						append pl/results pl/current-result
 						emit-event port 'read
 						start-next-cmd port
@@ -1646,6 +1650,7 @@ mysql-driver: make object![
 								pl/saved-status: 'reading-rows
 							]
 							(pl/current-cmd = defs/cmd/field-list) [
+								pl/current-result/query-finish-time: now/precise
 								append pl/results pl/current-result
 								emit-event port 'read
 								pl/stream-end?: true
@@ -1699,6 +1704,7 @@ mysql-driver: make object![
 								new-line/all pl/current-result/rows true
 							]
 						]
+						pl/current-result/query-finish-time: now/precise
 						;debug ["result: " mold pl/current-result]
 						append pl/results pl/current-result
 						;debug ["results length: " length? pl/results]
@@ -1707,7 +1713,7 @@ mysql-driver: make object![
 							pl/saved-status: 'reading-cmd-resp
 							pl/status: 'reading-packet-head
 							pl/next-packet-length: std-header-length
-							pl/current-result: make result-class [] ;get ready for next result set
+							pl/current-result: make result-class [query-start-time: pl/query-start-time] ;get ready for next result set
 						][
 							emit-event port 'read
 							;debug ["o-buf after reading query resp:" mold port/locals/o-buf]
@@ -1904,7 +1910,7 @@ mysql-driver: make object![
 						pl/saved-status: 'reading-cmd-resp
 						emit-event tcp-port 'wrote
 						;get ready for result
-						pl/current-result: make result-class []
+						pl/current-result: make result-class [query-start-time: pl/query-start-time]
 						pl/results: make block! 1
 						pl/more-results?: false
 						unless all [
@@ -1969,6 +1975,7 @@ mysql-driver: make object![
 		;debug ["do-tcp-insert" mold data]
 		
 		pl/result-options: options
+		pl/query-start-time: now/precise
 		if all [string? data data/1 = #"["][data: load data]
 		res: either block? data [
 			if empty? data [cause-error 'user 'message ["No data!"]]
