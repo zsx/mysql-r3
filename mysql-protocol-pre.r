@@ -1612,12 +1612,12 @@ mysql-driver: make object![
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
 							parse/all/case port/data [
-								read-field 	(col/catalog: field)
-								read-field 	(col/db: field)
-								read-field	(col/table:	field)
-								read-field	(col/org_table:	field)
-								read-field	(col/name: 	field)
-								read-field	(col/org_name: 	field)
+								read-field 	(col/catalog: to string! field)
+								read-field 	(col/db: to string! field)
+								read-field	(col/table: to string!	field)
+								read-field	(col/org_table: to string!	field)
+								read-field	(col/name: to string! field)
+								read-field	(col/org_name: to string! field)
 								read-byte	;filler
 								read-int	(col/charsetnr: int)
 								read-long	(col/length: long)
@@ -1629,8 +1629,8 @@ mysql-driver: make object![
 							]
 						][
 							parse/all/case port/data [
-								read-field	(col/table:	field)
-								read-field	(col/name: 	field)
+								read-field	(col/table:	to string! field)
+								read-field	(col/name: 	to string! field)
 								read-length	(col/length: len)
 								read-length	(col/type: decode/type len)
 								read-length	(col/flags: decode/flags len)
