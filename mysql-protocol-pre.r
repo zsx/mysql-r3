@@ -1952,8 +1952,8 @@ mysql-driver: make object![
 			]
 			close [
 				;close mysql-port
-				emit-event tcp-port 'close
 				close tcp-port
+				emit-event tcp-port 'close
 				return true
 			]
 		]
