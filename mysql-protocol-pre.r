@@ -2205,7 +2205,9 @@ sys/make-scheme [
 			tcp-port: port/locals/tcp-port
 			tcp-port/spec/timeout: 4
 			if open? tcp-port [
-				mysql-driver/send-cmd tcp-port mysql-driver/defs/cmd/quit []
+				attempt [;allow this to fail, so the port will always be closed
+					mysql-driver/send-cmd tcp-port mysql-driver/defs/cmd/quit []
+				]
 				close tcp-port
 			]
 			tcp-port/awake: none
