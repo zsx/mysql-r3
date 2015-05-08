@@ -1756,6 +1756,13 @@ mysql-driver: make object![
 		debug ["processing a greeting packet"]
 		tcp-port: port
 		pl: port/locals
+		if port/data/1 = 255 [;error packet
+			parse/all skip port/data 1 [
+				read-int 	(pl/error-code: int)
+				read-string (pl/error-msg: string)
+			]
+			cause-error 'Mysql-errors 'message reduce [pl/error-code pl/error-msg]
+		]
 		parse/all port/data [
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
