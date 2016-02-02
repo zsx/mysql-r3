@@ -2116,7 +2116,7 @@ sys/make-scheme [
 	spec: make system/standard/port-spec-net [
 		path: %
 		port-id: 3306
-		timeout: 30
+		timeout: 120
 		user:
 		pass: none
 	]
