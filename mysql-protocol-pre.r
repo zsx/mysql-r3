@@ -2136,6 +2136,7 @@ sys/make-scheme [
 			connect [
 				;debug ["mysql port connected"]
 				pl/handshaked?: true
+				if pl/exit-wait-after-handshaked? [return true]
 			]
 			read [
 
@@ -2198,6 +2199,7 @@ sys/make-scheme [
 				if none? port/spec/host [http-error "Missing host address"]
 				port/locals: make object! [
 					handshaked?: false
+					exit-wait-after-handshaked?: false
 					pending-requests: copy []
 					pending-block-size: 2
 					last-activity: now/precise
@@ -2319,6 +2321,16 @@ send-sql: func [
 		]
 		cause-error 'Mysql-errors 'timeout reduce [port none none]
 	]
+]
+
+connect-sql: func [
+	port [port!]
+	/local p
+][
+	port/locals/exit-wait-after-handshaked?: true
+	p: wait/only [port port/locals/tcp-port port/spec/timeout]
+	if port? p [return p]
+	cause-error 'Mysql-errors 'timeout reduce [port none none]
 ]
 
 last-mysql-cmd: func [
