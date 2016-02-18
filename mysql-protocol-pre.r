@@ -2276,6 +2276,10 @@ send-sql: func [
 ][
 	pl: port/locals
 
+	unless any [async open? port] [
+		cause-error 'Access 'not-connected reduce [port none none]
+	]
+
 	if string? data [
 		data: reduce [data]
 	]
