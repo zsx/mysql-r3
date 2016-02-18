@@ -1353,15 +1353,7 @@ mysql-driver: make object![
 		;;debug ["write function port state " open? tcp-port]
 		;if not open? tcp-port [open tcp-port]
 		;debug ["status:" tcp-port/locals/status]
-		if error? set/any 'err try [
-			write tcp-port data
-		][
-			;Change the error type to 'Mysql-errors so that the application can reset the connection
-			if err/Type = 'Access [
-				err/Type = 'Mysql-errors
-				do err
-			]
-		]
+		write tcp-port data
 	]
 
 	send-cmd: func [port [port!] cmd [integer!] cmd-data] compose/deep [
@@ -1460,7 +1452,7 @@ mysql-driver: make object![
 						[read-string (pl/error-msg: string)]
 					]
 				]
-				cause-error 'Mysql-errors 'message reduce [pl/error-code pl/error-msg]
+				cause-error 'user 'message reduce [port pl/error-code pl/error-msg]
 				return 'ERR
 			]
 			254 [
@@ -1769,7 +1761,7 @@ mysql-driver: make object![
 				read-int 	(pl/error-code: int)
 				read-string (pl/error-msg: string)
 			]
-			cause-error 'Mysql-errors 'message reduce [pl/error-code pl/error-msg]
+			cause-error 'Access 'message reduce [pl/error-code pl/error-msg]
 		]
 		parse/all port/data [
 			read-byte 	(pl/protocol: byte)
@@ -1874,7 +1866,7 @@ mysql-driver: make object![
 		;pl/exit-wait?: false
 		switch event/type [
 			error [
-				cause-error 'Mysql-errors 'read-error reduce [event/port "unknown" event]
+				cause-error 'Access 'read-error reduce [event/port "unknown" event]
 				return true
 			]
 			lookup [
@@ -2182,7 +2174,7 @@ sys/make-scheme [
 			]
 			close [
 				debug ["port closed"]
-				cause-error 'Mysql-errors 'not-connected reduce [event/port none none]
+				cause-error 'Access 'not-connected reduce [event/port none none]
 			]
 		][
 			cause-error 'user 'message reduce [rejoin ["unsupported event type on mysql port:" event/type]]
@@ -2315,11 +2307,11 @@ send-sql: func [
 				return port/data
 			][
 				;debug "wait returned none"
-				cause-error 'Mysql-errors 'timeout reduce [port none none]
+				cause-error 'Access 'timeout reduce [port none none]
 			]
 			;debug ["trying again..."]
 		]
-		cause-error 'Mysql-errors 'timeout reduce [port none none]
+		cause-error 'Access 'timeout reduce [port none none]
 	]
 ]
 
@@ -2330,7 +2322,7 @@ connect-sql: func [
 	port/locals/exit-wait-after-handshaked?: true
 	p: wait/only [port port/locals/tcp-port port/spec/timeout]
 	if port? p [return p]
-	cause-error 'Mysql-errors 'timeout reduce [port none none]
+	cause-error 'Access 'timeout reduce [port none none]
 ]
 
 last-mysql-cmd: func [
