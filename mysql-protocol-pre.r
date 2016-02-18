@@ -2325,7 +2325,7 @@ connect-sql: func [
 ][
 	port/locals/exit-wait-after-handshaked?: true
 	p: wait/only [port port/locals/tcp-port port/spec/timeout]
-	if port? p [return p]
+	if port? p [return port]
 	cause-error 'Access 'timeout reduce [port none none]
 ]
 
