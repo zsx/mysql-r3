@@ -1551,6 +1551,13 @@ mysql-driver: make object![
 					send-packet port write-string scramble/v10 port/pass port
 					pl/status: 'sending-old-auth-pack
 				][
+					if port/data/1 = 255 [;error packet
+						parse/all skip port/data 1 [
+							read-int        (pl/error-code: int)
+							read-string (pl/error-msg: string)
+						]
+						cause-error 'Access 'cannot-open reduce [port pl/error-msg pl/error-code]
+					]
 					;debug ["handshaked"]
 					;OK?
 					emit-event port 'connect
