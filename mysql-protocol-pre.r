@@ -1243,7 +1243,7 @@ mysql-driver: make object![
 			if v10 [return crypt-v10 data copy*/part seed 8]
 			either port/locals/protocol > 9 [
 				either port/locals/auth-v11 [
-					crypt-v11 to-binary data to-binary seed
+					crypt-v11 to-binary data seed
 				][
 					crypt-v10 data seed
 				]
@@ -1263,7 +1263,8 @@ mysql-driver: make object![
 	null-flag: false
 	ws: charset " ^-^M^/"
 
-	read-string: [[copy string to null null(string: to-string string)] | [copy string to end(string: to-string string)]] ;null-terminated string
+	read-bin-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
+	read-string: [read-bin-string (string: to string! string)] ;null-terminated string
 	read-byte: [copy byte byte-char (byte: to integer! :byte)]
 
 	;mysql uses little endian for all integers
@@ -1774,14 +1775,14 @@ mysql-driver: make object![
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
-			read-string	(pl/crypt-seed: string)
+			read-bin-string	(pl/crypt-seed: string)
 			read-int	(pl/capabilities: int)
 			read-byte	(pl/character-set: byte)
 			read-int	(pl/server-status: int) 
 			read-int	(pl/capabilities: (shift int 16) or pl/capabilities)
 			read-byte	(pl/seed-length: byte)
 			10 skip		; reserved for future use
-			read-string	(
+			read-bin-string	(
 				if string [
 					pl/crypt-seed: join copy* pl/crypt-seed string
 					pl/auth-v11: yes
