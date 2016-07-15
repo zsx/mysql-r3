@@ -2225,8 +2225,8 @@ sys/make-scheme [
 				attempt [;allow this to fail, so the port will always be closed
 					mysql-driver/send-cmd tcp-port mysql-driver/defs/cmd/quit []
 				]
-				close tcp-port
 			]
+			close tcp-port
 			tcp-port/awake: none
 			port/state: none
 		]
