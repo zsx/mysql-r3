@@ -1085,6 +1085,17 @@ mysql-driver: make object![
 		value
 	]
 
+	set 'to-sql-binary func [value [binary!] /local i][
+		m: make string! 10 + (2 * length? value) ;preallocate space for better performance
+		append m "_binary 0x"
+		forall value [
+			i: to integer! first value
+			append m pick "0123456789ABCDEF" (to integer! i / 16) + 1
+			append m pick "0123456789ABCDEF" (i // 16) + 1
+		]
+		m
+	]
+
 	set 'to-sql func [value /local res][
 		switch/default type?/word value [
 			none!	["NULL"]
@@ -1098,7 +1109,7 @@ mysql-driver: make object![
 			time!	[join "'" [value/hour ":" value/minute ":" value/second "'"]]
 			money!	[head remove find mold value "$"]
 			string!	[join "'" [sql-escape copy* value "'"]]
-			binary!	[to-sql to string! value]
+			binary!	[to-sql-binary value]
 			block!	[
 				if empty? value: reduce value [return "()"]
 				res: append make string! 100 #"("
