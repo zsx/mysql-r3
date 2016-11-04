@@ -881,6 +881,8 @@ mysql-driver: make object![
 		status:
 		saved-status: none
 		o-buf:
+		buf: make binary! 4 ; buffer for big packets
+		data-in-buf?:	; when this is set, the packet data is in `buf`, instead of tcp-port/data
 		current-result: none ;current result set
 		results: copy [] ;all result sets in current send-sql, there could be multiple results if more queries were sent in one call
 		result-options: none
@@ -1546,6 +1548,7 @@ mysql-driver: make object![
 
 	process-a-packet: func [
 		port [port!]
+		buf [binary!] "the packet buffer"
 		/local
 		pl
 		col
@@ -1559,19 +1562,19 @@ mysql-driver: make object![
 		debug ["processing a packet in status:" pl/status]
 		switch pl/status [
 			reading-greeting [
-				process-greeting-packet port ;status changed to sending-auth-pack
+				process-greeting-packet port buf ;status changed to sending-auth-pack
 				send-packet port pack-auth-packet port
 				pl/status: 'sending-auth-pack
 			]
 
 			reading-auth-resp [
-				either all [1 = length? port/data port/data/1 = #"^(FE)"][
+				either all [1 = length? buf buf/1 = #"^(FE)"][
 					;switch to old password mode
 					send-packet port write-string scramble/v10 port/pass port
 					pl/status: 'sending-old-auth-pack
 				][
-					if port/data/1 = 255 [;error packet
-						parse/all skip port/data 1 [
+					if buf/1 = 255 [;error packet
+						parse/all skip buf 1 [
 							read-int        (pl/error-code: int)
 							read-string (pl/error-msg: string)
 						]
@@ -1587,7 +1590,7 @@ mysql-driver: make object![
 			]
 
 			reading-old-auth-resp [
-				if port/data/1 = #"^(00)"[
+				if buf/1 = #"^(00)"[
 					emit-event port 'connect
 
 					;debug ["o-buf after old auth resp:" mold port/locals/o-buf]
@@ -1605,7 +1608,7 @@ mysql-driver: make object![
 						case [
 							any [pl/current-cmd = defs/cmd/query
 								pl/current-cmd = defs/cmd/field-list][
-								parse/all/case port/data [
+								parse/all/case buf [
 									read-length (if zero? pl/current-result/n-columns: len [
 											pl/stream-end?: true 
 											debug ["stream ended because of 0 columns"]
@@ -1636,14 +1639,14 @@ mysql-driver: make object![
 
 			reading-fields [
 				pkt-type: 'OTHER
-				if 0 != to integer! first port/data [; string with a length of 0, will be confused as an OK packet
+				if 0 != to integer! first buf [; string with a length of 0, will be confused as an OK packet
 					pkt-type: parse-a-packet port
 				]
 				switch/default pkt-type [
 					OTHER [
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
-							parse/all/case port/data [
+							parse/all/case buf [
 								read-field 	(col/catalog: to string! field)
 								read-field 	(col/db: to string! field)
 								read-field	(col/table: to string!	field)
@@ -1660,7 +1663,7 @@ mysql-driver: make object![
 								read-length	(col/default: len)
 							]
 						][
-							parse/all/case port/data [
+							parse/all/case buf [
 								read-field	(col/table:	to string! field)
 								read-field	(col/name: 	to string! field)
 								read-length	(col/length: len)
@@ -1710,14 +1713,14 @@ mysql-driver: make object![
 
 			reading-rows [
 				pkt-type: 'OTHER
-				if 0 != to integer! first port/data [; string with a length of 0, will be confused as an OK packet
+				if 0 != to integer! first buf [; string with a length of 0, will be confused as an OK packet
 					pkt-type: parse-a-packet port
 				]
 				switch/default pkt-type [
 					OTHER [
 						row: make block! pl/current-result/n-columns
-						debug ["row buf:" copy/part port/data pl/next-packet-length]
-						parse/all/case port/data [pl/current-result/n-columns [read-field (append row field)]]
+						debug ["row buf:" copy/part buf pl/next-packet-length]
+						parse/all/case buf [pl/current-result/n-columns [read-field (append row field)]]
 						debug ["row:" mold row]
 						if none? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
@@ -1777,19 +1780,20 @@ mysql-driver: make object![
 
 	process-greeting-packet: func [
 		port [port!]
+		data [binary!]
 		/local pl tcp-port
 	][
 		debug ["processing a greeting packet"]
 		tcp-port: port
 		pl: port/locals
-		if port/data/1 = 255 [;error packet
-			parse/all skip port/data 1 [
+		if data/1 = 255 [;error packet
+			parse/all skip data 1 [
 				read-int 	(pl/error-code: int)
 				read-string (pl/error-msg: string)
 			]
 			cause-error 'Access 'message reduce [pl/error-code pl/error-msg]
 		]
-		parse/all port/data [
+		parse/all data [
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
@@ -1912,7 +1916,6 @@ mysql-driver: make object![
 				debug ["current buffer length:" length? tcp-port/data ", data length:" length? tcp-port/data]
 				debug ["after adding data, length of buffer:" length? tcp-port/data]
 				;debug ["buffer with data:" mold tcp-port/data]
-				pl/stream-end?: true
 				while [true] [
 					debug ["next-len:" pl/next-packet-length ", buf: " length? tcp-port/data]
 					either pl/next-packet-length > length? tcp-port/data [; not enough data
@@ -1930,16 +1933,38 @@ mysql-driver: make object![
 								]
 								pl/status: 'reading-packet
 								pl/next-packet-length: pl/packet-len
-								remove/part tcp-port/data std-header-length
 								debug ["expected length of next packet:" pl/next-packet-length]
+								remove/part tcp-port/data std-header-length
 							]
 							reading-packet [
 								debug ["read a packet"]
-								pl/status: pl/saved-status
-								process-a-packet tcp-port ;restore the status back to what it was
+								either pl/packet-len < 16777215 [; a complete packet is read
+									pl/status: pl/saved-status ;restore the status back to what it was
+									debug ["a COMPLETE packet is received"]
+									either pl/data-in-buf? [
+										append/part pl/buf tcp-port/data pl/packet-len
+										process-a-packet tcp-port pl/buf ;adjust `status' for next step
+										clear pl/buf
+										pl/data-in-buf?: false
+									][
+										process-a-packet tcp-port tcp-port/data ;adjust `status' for next step
+									]
+								][  ; part of a big packet
+									debug ["a CHUNK of a packet is received"]
+									pl/data-in-buf?: true
+									append/part pl/buf tcp-port/data pl/packet-len
+									pl/status: 'reading-packet-head
+									pl/next-packet-length: std-header-length
+								]
 								remove/part tcp-port/data pl/packet-len
-								if pl/stream-end? [
-									;debug ["stream ended, exiting"]
+								if any [
+									pl/stream-end?
+									all [
+										pl/status != 'reading-packet-head
+										pl/status != 'reading-packet
+									]
+								][
+									debug ["stream ended, exiting"]
 									break
 								]
 							]
