@@ -1298,14 +1298,14 @@ mysql-driver: make object![
 		)
 	]
 	read-long64: [
-		read-long
-		skip 4 byte (print "Warning: long64 type detected !")
+		read-long (low: long)
+		read-long (long64: (shift long 32) or low)
 	]
 	read-length: [; length coded binary
 		#"^(FB)" (len: 0 null-flag: true)
 		| #"^(FC)" read-int (len: int)
 		| #"^(FD)" read-int24 (len: int24)
-		| #"^(FE)" read-long64 (len: long)
+		| #"^(FE)" read-long64 (len: long64)
 		| read-byte (len: byte)
 	]
 	read-field: [ ;length coded string
