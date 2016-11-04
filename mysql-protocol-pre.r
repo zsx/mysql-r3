@@ -1356,16 +1356,23 @@ mysql-driver: make object![
 	
 	send-packet: func [port [port!] data [binary!] /local tcp-port][
 		tcp-port: port
-		data: 
-			rejoin [
-				write-int24 length? data
+		while [16777215 <= length? data] [; size < 2**24 - 1
+			header: join
+				#{FFFFFF}
 				write-byte port/locals/seq-num: port/locals/seq-num + 1
-				data
-			]
+
+			insert data header
+			data: skip data 16777215 + length? header
+		]
 		;;debug ["write function port state " open? tcp-port]
 		;if not open? tcp-port [open tcp-port]
 		;debug ["status:" tcp-port/locals/status]
-		write tcp-port data
+		header: join
+			write-int24 length? data
+			write-byte port/locals/seq-num: port/locals/seq-num + 1
+
+		insert data header
+		write tcp-port head data
 	]
 
 	send-cmd: func [port [port!] cmd [integer!] cmd-data] compose/deep [
