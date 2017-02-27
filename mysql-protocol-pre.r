@@ -1007,7 +1007,7 @@ mysql-driver: make object![
 		geometry		[to string!]
 	]
 	
-	set 'change-type-handler func [p [port!] type [word!] blk [block!]][
+	change-type-handler: func [p [port!] type [word!] blk [block!]][
 		head change/only next find p/locals/conv-list type blk
 	]
 	
@@ -1080,7 +1080,7 @@ mysql-driver: make object![
 		#"\" 		"\\"
 	]
 
-	set 'sql-escape func [value [string!] /local c][
+	sql-escape: func [value [string!] /local c][
 		parse value [
 			any [
 				c: sql-chars (c: change/part c select escaped c/1 1) :c 
@@ -1090,7 +1090,7 @@ mysql-driver: make object![
 		value
 	]
 
-	set 'to-sql-binary func [value [binary!] /local i][
+	to-sql-binary: func [value [binary!] /local i][
 		m: make string! 10 + (2 * length value) ;preallocate space for better performance
 		append m "_binary 0x"
 		forall value [
@@ -1101,7 +1101,7 @@ mysql-driver: make object![
 		m
 	]
 
-	set 'to-sql func [value /local res][
+	to-sql: func [value /local res][
 		switch/default type?/word value [
 			blank!	["NULL"]
 			date!	[
@@ -1126,7 +1126,7 @@ mysql-driver: make object![
 		]
 	]
 	
-	set 'mysql-map-rebol-values func [data [block!] /local args sql mark][
+	mysql-map-rebol-values: func [data [block!] /local args sql mark][
 		args: reduce next data
 		sql: copy* pick data 1
 		mark: sql
