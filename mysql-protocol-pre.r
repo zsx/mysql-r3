@@ -1152,8 +1152,8 @@ mysql-driver: make object![
 
 	scrambler: make object! [
 		to-pair: func [value [integer!]][system/words/to-pair reduce [value 1]]
-		xor-pair: func [p1 p2][to-pair p1/x xor p2/x]
-		or-pair: func [p1 p2][to-pair p1/x or p2/x]
+		xor-pair: func [p1 p2][to-pair p1/x xor+ p2/x]
+		or-pair: func [p1 p2][to-pair p1/x or+ p2/x]
 		and-pair: func [p1 p2][to-pair p1/x and* p2/x]
 		remainder-pair: func [val1 val2 /local new][
 			val1: either negative? val1/x [abs val1/x + 2147483647.0][val1/x]
@@ -1239,7 +1239,7 @@ mysql-driver: make object![
 			d: seed1/x / to-decimal max-value/x
 			b: to-char floor (d * 31)
 
-			forall new [new/1: new/1 xor b]
+			forall new [new/1: new/1 xor+ b]
 			head new
 		]
 		
@@ -1247,7 +1247,7 @@ mysql-driver: make object![
 		crypt-v11: func [data [binary!] seed [binary!] /local key1 key2][
 			key1: checksum/secure data
 			key2: checksum/secure key1
-			key1 xor checksum/secure rejoin [(to-binary seed) key2]
+			key1 xor+ checksum/secure rejoin [(to-binary seed) key2]
 		]
 		
 		scramble: func [data [string! blank!] port [port!] /v10 /local seed][
@@ -1296,12 +1296,12 @@ mysql-driver: make object![
 		read-byte (b2: byte)
 		read-byte (
 			b3: byte
-			long: to-integer b0 or (shift b1 8) or (shift b2 16) or (shift b3 24) ;use or instead of arithmetic operations since rebol doesn't handle unsigned integers and the number could be larger than (2^31 - 1)
+			long: to-integer b0 or+ (shift b1 8) or+ (shift b2 16) or+ (shift b3 24) ;use or+ instead of arithmetic operations since rebol doesn't handle unsigned integers and the number could be larger than (2^31 - 1)
 		)
 	]
 	read-long64: [
 		read-long (low: long)
-		read-long (long64: (shift long 32) or low)
+		read-long (long64: (shift long 32) or+ low)
 	]
 	read-length: [; length coded binary
 		#"^(FB)" (len: 0 null-flag: true)
@@ -1801,7 +1801,7 @@ mysql-driver: make object![
 			read-int	(pl/capabilities: int)
 			read-byte	(pl/character-set: byte)
 			read-int	(pl/server-status: int) 
-			read-int	(pl/capabilities: (shift int 16) or pl/capabilities)
+			read-int	(pl/capabilities: (shift int 16) or+ pl/capabilities)
 			read-byte	(pl/seed-length: byte)
 			10 skip		; reserved for future use
 			read-bin-string	(
@@ -1824,15 +1824,15 @@ mysql-driver: make object![
 			(select defs/client feature) and pl/capabilities
 		]
 
-		tcp-port-param: defs/client/found-rows or defs/client/connect-with-db
+		tcp-port-param: defs/client/found-rows or+ defs/client/connect-with-db
 		tcp-port-param: either pl/capabilities and defs/client/protocol-41 [
 			tcp-port-param 
-			or defs/client/long-password 
-			or defs/client/transactions 
-			or defs/client/protocol-41
-			or defs/client/secure-connection
-			or defs/client/multi-queries
-			or defs/client/multi-results
+			or+ defs/client/long-password 
+			or+ defs/client/transactions 
+			or+ defs/client/protocol-41
+			or+ defs/client/secure-connection
+			or+ defs/client/multi-queries
+			or+ defs/client/multi-results
 		][
 			tcp-port-param and* complement defs/client/long-password
 		]
