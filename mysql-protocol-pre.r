@@ -1020,7 +1020,7 @@ mysql-driver: make object![
 		action: [if tmp: pick row (i)]
 		foreach col cols [
 			i: index? find cols col
-			if 'blank <> conv-func: select p/locals/conv-list col/type [
+			if void? conv-func: select p/locals/conv-list col/type [
 				;;debug ["conv-func:" mold conv-func "for" col/type]
 				append convert-body append/only compose action head
 					insert* at compose [change at row (i) :tmp] 5 conv-func
@@ -1673,7 +1673,7 @@ mysql-driver: make object![
 							]
 						]
 						blob-to-text: [blob text tinyblob tinytext mediumblob mediumtext longblob longtext]
-						unless blank? text-type: select blob-to-text col/type [
+						unless void? text-type: select blob-to-text col/type [
 							unless find? col/flags 'binary [
 								col/type: text-type
 							]
