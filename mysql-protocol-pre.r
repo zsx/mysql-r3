@@ -1078,7 +1078,7 @@ mysql-driver: make object![
 	]
 
 	set 'sql-escape func [value [string!] /local c][
-		parse/all value [
+		parse value [
 			any [
 				c: sql-chars (c: change/part c select escaped c/1 1) :c 
 				| sql-no-chars
@@ -1414,7 +1414,7 @@ mysql-driver: make object![
 	
 	insert-all-queries: func [port [port!] data [string!] /local s e res d][
 		d: port/locals/delimiter
-		parse/all s: data [
+		parse s: data [
 			any [
 				#"#" thru newline
 				| #"'" any ["\\" | "\'" | "''" | not-squote] #"'"
@@ -1454,7 +1454,7 @@ mysql-driver: make object![
 
 		switch status [
 			255 [
-				parse/all next port/data case [
+				parse next port/data case [
 					pl/capabilities and defs/client/protocol-41 [
 						[
 							read-int 	(pl/error-code: int)
@@ -1479,7 +1479,7 @@ mysql-driver: make object![
 			254 [
 				if pl/packet-len < 9 [
 					if pl/packet-len = 5 [
-						parse/all/case next port/data [
+						parse/case next port/data [
 							read-int	(pl/current-result/warnings: int)
 							read-int	(pl/more-results?: not zero? int and 8)
 						]
@@ -1501,7 +1501,7 @@ mysql-driver: make object![
 						]
 					]
 					; ignore session track info
-					parse/all/case next port/data rules
+					parse/case next port/data rules
 				]
 				return 'OK
 			]
@@ -1574,7 +1574,7 @@ mysql-driver: make object![
 					pl/status: 'sending-old-auth-pack
 				][
 					if buf/1 = 255 [;error packet
-						parse/all skip buf 1 [
+						parse skip buf 1 [
 							read-int        (pl/error-code: int)
 							read-string (pl/error-msg: string)
 						]
@@ -1608,7 +1608,7 @@ mysql-driver: make object![
 						case [
 							any [pl/current-cmd = defs/cmd/query
 								pl/current-cmd = defs/cmd/field-list][
-								parse/all/case buf [
+								parse/case buf [
 									read-length (if zero? pl/current-result/n-columns: len [
 											pl/stream-end?: true 
 											debug ["stream ended because of 0 columns"]
@@ -1646,7 +1646,7 @@ mysql-driver: make object![
 					OTHER [
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
-							parse/all/case buf [
+							parse/case buf [
 								read-field 	(col/catalog: to string! field)
 								read-field 	(col/db: to string! field)
 								read-field	(col/table: to string!	field)
@@ -1663,7 +1663,7 @@ mysql-driver: make object![
 								read-length	(col/default: len)
 							]
 						][
-							parse/all/case buf [
+							parse/case buf [
 								read-field	(col/table:	to string! field)
 								read-field	(col/name: 	to string! field)
 								read-length	(col/length: len)
@@ -1720,7 +1720,7 @@ mysql-driver: make object![
 					OTHER [
 						row: make block! pl/current-result/n-columns
 						debug ["row buf:" copy/part buf pl/next-packet-length]
-						parse/all/case buf [pl/current-result/n-columns [read-field (append row field)]]
+						parse/case buf [pl/current-result/n-columns [read-field (append row field)]]
 						debug ["row:" mold row]
 						if blank? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
@@ -1787,13 +1787,13 @@ mysql-driver: make object![
 		tcp-port: port
 		pl: port/locals
 		if data/1 = 255 [;error packet
-			parse/all skip data 1 [
+			parse skip data 1 [
 				read-int 	(pl/error-code: int)
 				read-string (pl/error-msg: string)
 			]
 			cause-error 'Access 'message reduce [pl/error-code pl/error-msg]
 		]
-		parse/all data [
+		parse data [
 			read-byte 	(pl/protocol: byte)
 			read-string (pl/version: string)
 			read-long 	(pl/thread-id: long)
@@ -1927,7 +1927,7 @@ mysql-driver: make object![
 						switch/default pl/status [
 							reading-packet-head [
 								debug ["read a packet head" mold copy/part tcp-port/data std-header-length]
-								parse/all tcp-port/data [
+								parse tcp-port/data [
 									read-int24  (pl/packet-len: int24)
 									read-byte	(pl/seq-num: byte)
 								]
