@@ -1032,7 +1032,7 @@ mysql-driver: make object![
 				while [not tail? rows][
 					row: rows
 					do convert-body
-					rows: skip rows length? cols
+					rows: skip rows length cols
 				]
 			][
 				foreach row rows :convert-body
@@ -1088,7 +1088,7 @@ mysql-driver: make object![
 	]
 
 	set 'to-sql-binary func [value [binary!] /local i][
-		m: make string! 10 + (2 * length? value) ;preallocate space for better performance
+		m: make string! 10 + (2 * length value) ;preallocate space for better performance
 		append m "_binary 0x"
 		forall value [
 			i: to integer! first value
@@ -1198,7 +1198,7 @@ mysql-driver: make object![
 		crypt-v9: func [data [string!] seed [string!] /local
 			new max-value clip-max hp hm nr seed1 seed2 d b i
 		][
-			new: make string! length? seed
+			new: make string! length seed
 			max-value: to-pair to-integer #01FFFFFF
 			clip-max: func [value][remainder-pair value max-value]
 			hp: hash-v9 seed
@@ -1219,7 +1219,7 @@ mysql-driver: make object![
 		crypt-v10: func [data [string!] seed [string!] /local
 			new max-value clip-max pw msg seed1 seed2 d b i
 		][
-			new: make string! length? seed
+			new: make string! length seed
 			max-value: to-pair to-integer #3FFFFFFF
 			clip-max: func [value][remainder-pair value max-value]
 			pw: hash-v10 seed
@@ -1358,19 +1358,19 @@ mysql-driver: make object![
 	
 	send-packet: func [port [port!] data [binary!] /local tcp-port][
 		tcp-port: port
-		while [16777215 <= length? data] [; size < 2**24 - 1
+		while [16777215 <= length data] [; size < 2**24 - 1
 			header: join
 				#{FFFFFF}
 				write-byte port/locals/seq-num: port/locals/seq-num + 1
 
 			insert data header
-			data: skip data 16777215 + length? header
+			data: skip data 16777215 + length header
 		]
 		;;debug ["write function port state " open? tcp-port]
 		;if not open? tcp-port [open tcp-port]
 		;debug ["status:" tcp-port/locals/status]
 		header: join
-			write-int24 length? data
+			write-int24 length data
 			write-byte port/locals/seq-num: port/locals/seq-num + 1
 
 		insert data header
@@ -1568,7 +1568,7 @@ mysql-driver: make object![
 			]
 
 			reading-auth-resp [
-				either all [1 = length? buf buf/1 = #"^(FE)"][
+				either all [1 = length buf buf/1 = #"^(FE)"][
 					;switch to old password mode
 					send-packet port write-string scramble/v10 port/pass port
 					pl/status: 'sending-old-auth-pack
@@ -1748,7 +1748,7 @@ mysql-driver: make object![
 						pl/current-result/query-finish-time: now/precise
 						;debug ["result: " mold pl/current-result]
 						append pl/results pl/current-result
-						;debug ["results length: " length? pl/results]
+						;debug ["results length: " length pl/results]
 						either pl/more-results? [
 							pl/stream-end?: false
 							pl/saved-status: 'reading-cmd-resp
@@ -1847,20 +1847,20 @@ mysql-driver: make object![
 		auth-pack: either pl/capabilities and defs/client/protocol-41 [
 			rejoin [
 				write-long tcp-port-param
-				;write-long (length? port/user) + (length? port/pass)
+				;write-long (length port/user) + (length port/pass)
 				;	+ 7 + std-header-length
 				write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
 				write-byte pl/character-set
 				{^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@} ;23 0's
 				write-string any [port/spec/user ""]
-				write-byte length? key: scramble port/spec/pass port
+				write-byte length key: scramble port/spec/pass port
 				key
 				write-string any [path "^@"]
 			]
 		][
 			rejoin [
 				write-int tcp-port-param
-				write-int24 (length? port/spec/user) + (length? port/spec/pass)
+				write-int24 (length port/spec/user) + (length port/spec/pass)
 					+ 7 + std-header-length
 				write-string any [port/spec/user ""]
 				write-string key: scramble port/pass port
@@ -1913,12 +1913,12 @@ mysql-driver: make object![
 			read [
 				;;debug "read event"
 				;debug ["buffer:" mold tcp-port/data]
-				debug ["current buffer length:" length? tcp-port/data ", data length:" length? tcp-port/data]
-				debug ["after adding data, length of buffer:" length? tcp-port/data]
+				debug ["current buffer length:" length tcp-port/data ", data length:" length tcp-port/data]
+				debug ["after adding data, length of buffer:" length tcp-port/data]
 				;debug ["buffer with data:" mold tcp-port/data]
 				while [true] [
-					debug ["next-len:" pl/next-packet-length ", buf: " length? tcp-port/data]
-					either pl/next-packet-length > length? tcp-port/data [; not enough data
+					debug ["next-len:" pl/next-packet-length ", buf: " length tcp-port/data]
+					either pl/next-packet-length > length tcp-port/data [; not enough data
 						read tcp-port
 						;debug ["keep reading"]
 						break
@@ -2102,7 +2102,7 @@ mysql-driver: make object![
 	][
 		;debug ["converting results:" mold results]
 		either any [
-			1 < length? results
+			1 < length results
 			port/locals/current-cmd != defs/cmd/query
 		][;results from multiple queries
 			return results
@@ -2115,15 +2115,15 @@ mysql-driver: make object![
 						columns [block!]
 						/local tmp n
 					][
-						tmp: make block! 2 * length? rows
-						repeat n length? columns [
+						tmp: make block! 2 * length rows
+						repeat n length columns [
 							append tmp columns/:n/name
 							append tmp rows/:n
 						]
 						tmp
 					]
 					either opts/flat? [
-						if ret/n-columns < length? ret/rows [
+						if ret/n-columns < length ret/rows [
 							cause-error 'user 'message ["/flat and /name-fields can't be used for this case, because of multiple rows"]
 						]
 						ret: name-fields ret/rows ret/columns
