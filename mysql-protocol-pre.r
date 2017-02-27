@@ -1108,9 +1108,9 @@ mysql-driver: make object![
 					][""] "'"
 				]
 			]
-			time!	[join "'" [value/hour ":" value/minute ":" value/second "'"]]
+			time!	[join-of "'" [value/hour ":" value/minute ":" value/second "'"]]
 			money!	[head remove find mold value "$"]
-			string!	[join "'" [sql-escape copy* value "'"]]
+			string!	[join-of "'" [sql-escape copy* value "'"]]
 			binary!	[to-sql-binary value]
 			block!	[
 				if empty? value: reduce value [return "()"]
@@ -1332,18 +1332,18 @@ mysql-driver: make object![
 	]
 	
 	write-int: func [value [integer!]][
-		join write-byte value // 256 write-byte value / 256
+		join-of write-byte value // 256 write-byte value / 256
 	]
 
 	write-int24: func [value [integer!]][
-		join write-byte value // 256 [
+		join-of write-byte value // 256 [
 			write-byte (to integer! value / 256) and 255
 			write-byte (to integer! value / 65536) and 255
 		]
 	]
 
 	write-long: func [value [integer!]][
-		join write-byte value // 256 [
+		join-of write-byte value // 256 [
 			write-byte (to integer! value / 256) and 255
 			write-byte (to integer! value / 65536) and 255
 			write-byte (to integer! value / 16777216) and 255
@@ -1353,13 +1353,13 @@ mysql-driver: make object![
 	write-string: func [value [string! blank! binary!] /local t][
 		if blank? value [return make binary! 0]
 		;debug ["writing a string:" mold value]
-		to-binary join value to char! 0
+		to-binary join-of value to char! 0
 	]
 	
 	send-packet: func [port [port!] data [binary!] /local tcp-port][
 		tcp-port: port
 		while [16777215 <= length data] [; size < 2**24 - 1
-			header: join
+			header: join-of
 				#{FFFFFF}
 				write-byte port/locals/seq-num: port/locals/seq-num + 1
 
@@ -1369,7 +1369,7 @@ mysql-driver: make object![
 		;;debug ["write function port state " open? tcp-port]
 		;if not open? tcp-port [open tcp-port]
 		;debug ["status:" tcp-port/locals/status]
-		header: join
+		header: join-of
 			write-int24 length data
 			write-byte port/locals/seq-num: port/locals/seq-num + 1
 
@@ -1806,7 +1806,7 @@ mysql-driver: make object![
 			10 skip		; reserved for future use
 			read-bin-string	(
 				if string [
-					pl/crypt-seed: join copy* pl/crypt-seed string
+					pl/crypt-seed: join-of copy* pl/crypt-seed string
 					pl/auth-v11: yes
 				]
 			)
