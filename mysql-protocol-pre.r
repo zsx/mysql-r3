@@ -1046,7 +1046,7 @@ mysql-driver: make object![
 		][
 			list: make block! 10
 			foreach [name value] either flags [defs/flag][defs/client][
-				if value = (int and value) [append list :name]	
+				if value = (int and* value) [append list :name]	
 			]
 			list
 		]
@@ -1154,7 +1154,7 @@ mysql-driver: make object![
 		to-pair: func [value [integer!]][system/words/to-pair reduce [value 1]]
 		xor-pair: func [p1 p2][to-pair p1/x xor p2/x]
 		or-pair: func [p1 p2][to-pair p1/x or p2/x]
-		and-pair: func [p1 p2][to-pair p1/x and p2/x]
+		and-pair: func [p1 p2][to-pair p1/x and* p2/x]
 		remainder-pair: func [val1 val2 /local new][
 			val1: either negative? val1/x [abs val1/x + 2147483647.0][val1/x]
 			val2: either negative? val2/x [abs val2/x + 2147483647.0][val2/x]
@@ -1337,16 +1337,16 @@ mysql-driver: make object![
 
 	write-int24: func [value [integer!]][
 		join-of write-byte value // 256 [
-			write-byte (to integer! value / 256) and 255
-			write-byte (to integer! value / 65536) and 255
+			write-byte (to integer! value / 256) and* 255
+			write-byte (to integer! value / 65536) and* 255
 		]
 	]
 
 	write-long: func [value [integer!]][
 		join-of write-byte value // 256 [
-			write-byte (to integer! value / 256) and 255
-			write-byte (to integer! value / 65536) and 255
-			write-byte (to integer! value / 16777216) and 255
+			write-byte (to integer! value / 256) and* 255
+			write-byte (to integer! value / 65536) and* 255
+			write-byte (to integer! value / 16777216) and* 255
 		]
 	]
 
@@ -1481,7 +1481,7 @@ mysql-driver: make object![
 					if pl/packet-len = 5 [
 						parse/case next port/data [
 							read-int	(pl/current-result/warnings: int)
-							read-int	(pl/more-results?: not zero? int and 8)
+							read-int	(pl/more-results?: not zero? int and* 8)
 						]
 					]
 					return 'EOF
@@ -1492,7 +1492,7 @@ mysql-driver: make object![
 					rules: [
 						read-length	(pl/current-result/affected-rows: len)
 						read-length (pl/current-result/last-insert-id: len)
-						read-int	(pl/more-results?: not zero? int and 8)
+						read-int	(pl/more-results?: not zero? int and* 8)
 						read-int	(pl/current-result/server-status: int)
 					]
 					if pl/capabilities and defs/client/protocol-41 [
@@ -1834,7 +1834,7 @@ mysql-driver: make object![
 			or defs/client/multi-queries
 			or defs/client/multi-results
 		][
-			tcp-port-param and complement defs/client/long-password
+			tcp-port-param and* complement defs/client/long-password
 		]
 	]
 
