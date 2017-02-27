@@ -873,21 +873,21 @@ mysql-driver: make object![
 		last-status:
 		stream-end?:		;are there more rows to be read?
 		more-results?: false
-		expecting: none
+		expecting: _
 		packet-len: 0
 		last-activity: now/precise
 		next-packet-length: 0
 		current-cmd:
 		status:
-		saved-status: none
+		saved-status: _
 		o-buf:
 		buf: make binary! 4 ; buffer for big packets
 		data-in-buf?:	; when this is set, the packet data is in `buf`, instead of tcp-port/data
-		current-result: none ;current result set
+		current-result: _ ;current result set
 		results: copy [] ;all result sets in current send-sql, there could be multiple results if more queries were sent in one call
-		result-options: none
-		current-cmd-data: none
-		query-start-time: none
+		result-options: _
+		current-cmd-data: _
+		query-start-time: _
 	;-------
 		auto-commit: on		; not used, just reserved for /Command compatibility.
 		delimiter: #";"
@@ -906,7 +906,7 @@ mysql-driver: make object![
 		character-set:
 		server-status:
 		seed-length:
-		auth-v11: none
+		auth-v11: _
 	]
 
 	result-class: make object! [
@@ -930,8 +930,8 @@ mysql-driver: make object![
 	]
 
 	column-class: make object! [
-		table: name: length: type: flags: decimals: none
-		catalog: db: org_table: org_name: charsetnr: length: default: none
+		table: name: length: type: flags: decimals: _
+		catalog: db: org_table: org_name: charsetnr: length: default: _
 	]
 	
 	month: [ "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul"
@@ -988,14 +988,14 @@ mysql-driver: make object![
 		year			[to integer! to string!]
 		newdate			[to string!]
 		var-char		[to string!]
-		bit				none
+		bit				_
 		new-decimal		[to decimal! to string!]
 		enum			[to string!]
 		set				[to string!]
-		tiny-blob		none
-		medium-blob		none
-		long-blob		none
-		blob			none
+		tiny-blob		_
+		medium-blob		_
+		long-blob		_
+		blob			_
 		tiny-text		[to string!]
 		medium-text		[to string!]
 		long-text		[to string!]
@@ -1020,7 +1020,7 @@ mysql-driver: make object![
 		action: [if tmp: pick row (i)]
 		foreach col cols [
 			i: index? find cols col
-			if 'none <> conv-func: select p/locals/conv-list col/type [
+			if 'blank <> conv-func: select p/locals/conv-list col/type [
 				;;debug ["conv-func:" mold conv-func "for" col/type]
 				append convert-body append/only compose action head
 					insert* at compose [change at row (i) :tmp] 5 conv-func
@@ -1100,7 +1100,7 @@ mysql-driver: make object![
 
 	set 'to-sql func [value /local res][
 		switch/default type?/word value [
-			none!	["NULL"]
+			blank!	["NULL"]
 			date!	[
 				rejoin ["'" value/year "-" value/month "-" value/day
 					either value: value/time [
@@ -1250,8 +1250,8 @@ mysql-driver: make object![
 			key1 xor checksum/secure rejoin [(to-binary seed) key2]
 		]
 		
-		scramble: func [data [string! none!] port [port!] /v10 /local seed][
-			if any [none? data empty? data][return make binary! 0]
+		scramble: func [data [string! blank!] port [port!] /v10 /local seed][
+			if any [blank? data empty? data][return make binary! 0]
 			seed: port/locals/crypt-seed
 			if v10 [return crypt-v10 data copy*/part seed 8]
 			either port/locals/protocol > 9 [
@@ -1270,7 +1270,7 @@ mysql-driver: make object![
 	
 ;------ Data reading ------
 
-	b0: b1: b2: b3: int: int24: long: string: field: len: byte: s: none
+	b0: b1: b2: b3: int: int24: long: string: field: len: byte: s: _
 	byte-char: complement charset []
 	null: to-char 0
 	null-flag: false
@@ -1312,7 +1312,7 @@ mysql-driver: make object![
 	]
 	read-field: [ ;length coded string
 		(null-flag: false)
-		read-length s: (either null-flag [field: none]
+		read-length s: (either null-flag [field: _]
 			[field:	copy*/part s len s: skip s len]) :s
 	]
 	
@@ -1321,7 +1321,7 @@ mysql-driver: make object![
 			to-string read-packet port
 		][
 			res: read-packet port
-			either all [cmd = defs/cmd/ping zero? port/locals/last-status][true][none]
+			either all [cmd = defs/cmd/ping zero? port/locals/last-status][true][_]
 		]
 	]
 	
@@ -1350,8 +1350,8 @@ mysql-driver: make object![
 		]
 	]
 
-	write-string: func [value [string! none! binary!] /local t][
-		if none? value [return make binary! 0]
+	write-string: func [value [string! blank! binary!] /local t][
+		if blank? value [return make binary! 0]
 		;debug ["writing a string:" mold value]
 		to-binary join value to char! 0
 	]
@@ -1409,7 +1409,7 @@ mysql-driver: make object![
 	insert-query: func [port [port!] data [string! block!]][
 		;debug reform ["insert-query:" data]
 		send-cmd port defs/cmd/query data
-		none
+		_
 	]
 	
 	insert-all-queries: func [port [port!] data [string!] /local s e res d][
@@ -1450,7 +1450,7 @@ mysql-driver: make object![
 		pl: port/locals
 
 		pl/last-status: status: to integer! port/data/1
-		pl/error-code: pl/error-msg: none
+		pl/error-code: pl/error-msg: _
 
 		switch status [
 			255 [
@@ -1462,7 +1462,7 @@ mysql-driver: make object![
 							read-string (pl/error-msg: string)
 						]
 					]
-					any [none? pl/protocol pl/protocol > 9][
+					any [blank? pl/protocol pl/protocol > 9][
 						[
 							read-int 	(pl/error-code: int)
 							read-string (pl/error-msg: string)
@@ -1488,7 +1488,7 @@ mysql-driver: make object![
 				]
 			]
 			0 [
-				if none? pl/expecting [
+				if blank? pl/expecting [
 					rules: [
 						read-length	(pl/current-result/affected-rows: len)
 						read-length (pl/current-result/last-insert-id: len)
@@ -1673,12 +1673,12 @@ mysql-driver: make object![
 							]
 						]
 						blob-to-text: [blob text tinyblob tinytext mediumblob mediumtext longblob longtext]
-						unless none? text-type: select blob-to-text col/type [
+						unless blank? text-type: select blob-to-text col/type [
 							unless found? find col/flags 'binary [
 								col/type: text-type
 							]
 						]
-						if none? pl/current-result/columns [
+						if blank? pl/current-result/columns [
 							pl/current-result/columns: make block! pl/current-result/n-columns
 						]
 						debug ["read a column:" mold col]
@@ -1722,7 +1722,7 @@ mysql-driver: make object![
 						debug ["row buf:" copy/part buf pl/next-packet-length]
 						parse/all/case buf [pl/current-result/n-columns [read-field (append row field)]]
 						debug ["row:" mold row]
-						if none? pl/current-result/rows [
+						if blank? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
 						]
 						either pl/result-options/flat? [
@@ -2083,7 +2083,7 @@ mysql-driver: make object![
 			status: 'init
 			mysql-port: port
 			o-buf: make block! 10
-			;o-buf: copy [none]
+			;o-buf: copy [_]
 			conv-list: copy conv-model
 			current-result: make result-class []
 			result-options: make result-option-class []
@@ -2161,7 +2161,7 @@ sys/make-scheme [
 		port-id: 3306
 		timeout: 120
 		user:
-		pass: none
+		pass: _
 	]
 	
 	info: make system/standard/file-info [
@@ -2201,8 +2201,8 @@ sys/make-scheme [
 								;debug ["a block callback:" mold cb]
 								do cb
 							]
-							none? cb [
-								debug ["a none callback, ignored"]
+							blank? cb [
+								debug ["a blank callback, ignored"]
 								;ignored
 							]
 							'else [
@@ -2225,7 +2225,7 @@ sys/make-scheme [
 			]
 			close [
 				debug ["port closed"]
-				cause-error 'Access 'not-connected reduce [event/port none none]
+				cause-error 'Access 'not-connected reduce [event/port _ _]
 			]
 		][
 			cause-error 'user 'message reduce [rejoin ["unsupported event type on mysql port:" event/type]]
@@ -2239,7 +2239,7 @@ sys/make-scheme [
 				port[port! url!]
 			][	
 				;;debug " new open function "
-				if none? port/spec/host [http-error "Missing host address"]
+				if blank? port/spec/host [http-error "Missing host address"]
 				port/locals: make object! [
 					handshaked?: false
 					exit-wait-after-handshaked?: false
@@ -2270,8 +2270,8 @@ sys/make-scheme [
 				]
 			]
 			close tcp-port
-			tcp-port/awake: none
-			port/state: none
+			tcp-port/awake: _
+			port/state: _
 		]
 
 		insert: func [
@@ -2284,7 +2284,7 @@ sys/make-scheme [
 			options: data/1
 			either object? options [
 				either all [logic? :options/async? not :options/async?][
-					append pl/pending-requests reduce ['sync none]
+					append pl/pending-requests reduce ['sync _]
 				][
 					if options/named? [
 						cause-error 'user 'message ["/named can't be used with /async"]
@@ -2294,7 +2294,7 @@ sys/make-scheme [
 				
 				remove data ;remove the first element
 			][
-				append pl/pending-requests reduce ['sync none]
+				append pl/pending-requests reduce ['sync _]
 			]
 			;debug ["inserting a query:" mold data mold pl/pending-requests]
 			mysql-driver/tcp-insert tcp-port data options
@@ -2321,14 +2321,14 @@ send-sql: func [
 	/flat "return a flatten block"
 	/raw "do not do type conversion"
 	/named
-	/async cb [word! path! function! block! none!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
+	/async cb [word! path! function! block! blank!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
 	/verbose "return detailed info"
 	/local result pl old-handshaked?
 ][
 	pl: port/locals
 
 	unless any [async open? port] [
-		cause-error 'Access 'not-connected reduce [port none none]
+		cause-error 'Access 'not-connected reduce [port _ _]
 	]
 
 	if string? data [
@@ -2361,12 +2361,12 @@ send-sql: func [
 				debug ["port/data:" mold port/data]
 				return port/data
 			][
-				;debug "wait returned none"
-				cause-error 'Access 'timeout reduce [port none none]
+				;debug "wait returned _"
+				cause-error 'Access 'timeout reduce [port _ _]
 			]
 			;debug ["trying again..."]
 		]
-		cause-error 'Access 'timeout reduce [port none none]
+		cause-error 'Access 'timeout reduce [port _ _]
 	]
 ]
 
@@ -2377,7 +2377,7 @@ connect-sql: func [
 	port/locals/exit-wait-after-handshaked?: true
 	p: wait/only [port port/locals/tcp-port port/spec/timeout]
 	if port? p [return port]
-	cause-error 'Access 'timeout reduce [port none none]
+	cause-error 'Access 'timeout reduce [port _ _]
 ]
 
 last-mysql-cmd: func [
