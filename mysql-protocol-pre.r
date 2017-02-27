@@ -8,6 +8,8 @@ REBOL [
 	Version: 2.0.0
 	Purpose: "MySQL Driver for REBOL"
 	GIT-COMMIT: "<GIT-COMMIT-ID>"
+	Type: 'module
+	Export: [send-sql connect-sql last-mysql-cmd]
 ]
 mysql-errors: [
 ;imported from mysqld_error.h in libmysqtcp-port
