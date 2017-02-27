@@ -1721,7 +1721,7 @@ mysql-driver: make object![
 					OTHER [
 						row: make block! pl/current-result/n-columns
 						debug ["row buf:" copy/part buf pl/next-packet-length]
-						parse/case buf [pl/current-result/n-columns [read-field (append row field)]]
+						parse/case buf [pl/current-result/n-columns [read-field (append row to-string field)]]
 						debug ["row:" mold row]
 						if blank? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
