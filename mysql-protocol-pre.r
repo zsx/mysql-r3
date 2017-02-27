@@ -944,8 +944,8 @@ mysql-driver: make object![
 				yy: copy*/part v 4
 				mm: copy*/part skip v 5 2
 				dd: copy*/part skip v 8 2
-				either (to-integer mm) <> 0 [
-					to date! rejoin [dd "-" month/(to-integer mm) "-" yy]
+				either (to-integer/unsigned mm) <> 0 [
+					to date! rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy]
 				][
 					to date! rejoin ["01-Jan-"yy]
 				]
@@ -962,8 +962,8 @@ mysql-driver: make object![
 				
 				h: copy*/part skip v 11 2
 				m: copy*/part skip v 14 2
-				either (to-integer mm) <> 0 [
-					to date! rejoin [dd "-" month/(to-integer mm) "-" yy "/" h ":" m]
+				either (to-integer/unsigned mm) <> 0 [
+					to date! rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy "/" h ":" m]
 				][
 					to date! rejoin ["01-Jan-" yy "/" h ":" m]
 				] 
@@ -975,19 +975,19 @@ mysql-driver: make object![
 	
 	conv-model: [
 		decimal			[to decimal! to string!]
-		tiny			[to integer! to string!]
-		short			[to integer! to string!]
-		long			[to integer! to string!]
+		tiny			[to-integer/unsigned to string!]
+		short			[to-integer/unsigned to string!]
+		long			[to-integer/unsigned to string!]
 		float			[to decimal! to string!]
 		double			[to decimal! to string!]
 		null			[to string!]
 		timestamp		[to string!]
-		longlong		[to integer! to string!]
-		int24			[to integer! to string!]
+		longlong		[to-integer/unsigned to string!]
+		int24			[to-integer/unsigned to string!]
 		date			[my-to-date to string!]
 		time			[to time! to string!]
 		datetime		[my-to-datetime to string!]
-		year			[to integer! to string!]
+		year			[to-integer/unsigned to string!]
 		newdate			[to string!]
 		var-char		[to string!]
 		bit				_
@@ -1094,8 +1094,8 @@ mysql-driver: make object![
 		m: make string! 10 + (2 * length value) ;preallocate space for better performance
 		append m "_binary 0x"
 		forall value [
-			i: to integer! first value
-			append m pick "0123456789ABCDEF" (to integer! i / 16) + 1
+			i: to-integer/unsigned first value
+			append m pick "0123456789ABCDEF" (to-integer/unsigned i / 16) + 1
 			append m pick "0123456789ABCDEF" (i // 16) + 1
 		]
 		m
@@ -1161,10 +1161,10 @@ mysql-driver: make object![
 		remainder-pair: func [val1 val2 /local new][
 			val1: either negative? val1/x [abs val1/x + 2147483647.0][val1/x]
 			val2: either negative? val2/x [abs val2/x + 2147483647.0][val2/x]
-			to-pair to-integer val1 // val2
+			to-pair to-integer/unsigned val1 // val2
 		]
 		floor: func [value][
-			value: to-integer either negative? value [value - .999999999999999][value]
+			value: to-integer/unsigned either negative? value [value - .999999999999999][value]
 			either negative? value [complement value][value]
 		]
 
@@ -1173,7 +1173,7 @@ mysql-driver: make object![
 			nr2: 7x1
 			foreach byte data [
 				if all [byte <> #" " byte <> #"^(tab)"][
-					byte: to-pair to-integer byte
+					byte: to-pair to-integer/unsigned byte
 					nr: xor-pair nr (((and-pair 63x1 nr) + nr2) * byte) + (nr * 256x1)
 					nr2: nr2 + byte
 				]
@@ -1184,17 +1184,17 @@ mysql-driver: make object![
 		hash-v10: func [data [string!] /local nr nr2 adding byte][
 			nr: 1345345333x1
 			adding: 7x1
-			nr2: to-pair to-integer #12345671
+			nr2: to-pair to-integer/unsigned #12345671
 			foreach byte data [
 				if all [byte <> #" " byte <> #"^(tab)"][
-					byte: to-pair to-integer byte
+					byte: to-pair to-integer/unsigned byte
 					nr: xor-pair nr (((and-pair 63x1 nr) + adding) * byte) + (nr * 256x1)
 					nr2: nr2 + xor-pair nr (nr2 * 256x1)
 					adding: adding + byte
 				]
 			]
-			nr: and-pair nr to-pair to-integer #7FFFFFFF
-			nr2: and-pair nr2 to-pair to-integer #7FFFFFFF
+			nr: and-pair nr to-pair to-integer/unsigned #7FFFFFFF
+			nr2: and-pair nr2 to-pair to-integer/unsigned #7FFFFFFF
 			reduce [nr nr2]
 		]
 
@@ -1202,7 +1202,7 @@ mysql-driver: make object![
 			new max-value clip-max hp hm nr seed1 seed2 d b i
 		][
 			new: make string! length seed
-			max-value: to-pair to-integer #01FFFFFF
+			max-value: to-pair to-integer/unsigned #01FFFFFF
 			clip-max: func [value][remainder-pair value max-value]
 			hp: hash-v9 seed
 			hm: hash-v9 data	
@@ -1223,7 +1223,7 @@ mysql-driver: make object![
 			new max-value clip-max pw msg seed1 seed2 d b i
 		][
 			new: make string! length seed
-			max-value: to-pair to-integer #3FFFFFFF
+			max-value: to-pair to-integer/unsigned #3FFFFFFF
 			clip-max: func [value][remainder-pair value max-value]
 			pw: hash-v10 seed
 			msg: hash-v10 data	
@@ -1281,7 +1281,7 @@ mysql-driver: make object![
 
 	read-bin-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
 	read-string: [read-bin-string (string: to string! string)] ;null-terminated string
-	read-byte: [copy byte byte-char (byte: to integer! :byte)]
+	read-byte: [copy byte byte-char (byte: to-integer/unsigned :byte)]
 
 	;mysql uses little endian for all integers
 	read-int: [
@@ -1299,7 +1299,7 @@ mysql-driver: make object![
 		read-byte (b2: byte)
 		read-byte (
 			b3: byte
-			long: to-integer b0 or+ (shift b1 8) or+ (shift b2 16) or+ (shift b3 24) ;use or+ instead of arithmetic operations since rebol doesn't handle unsigned integers and the number could be larger than (2^31 - 1)
+			long: to-integer/unsigned b0 or+ (shift b1 8) or+ (shift b2 16) or+ (shift b3 24) ;use or+ instead of arithmetic operations since rebol doesn't handle unsigned integers and the number could be larger than (2^31 - 1)
 		)
 	]
 	read-long64: [
@@ -1340,16 +1340,16 @@ mysql-driver: make object![
 
 	write-int24: func [value [integer!]][
 		join-of write-byte value // 256 [
-			write-byte (to integer! value / 256) and* 255
-			write-byte (to integer! value / 65536) and* 255
+			write-byte (to-integer/unsigned value / 256) and* 255
+			write-byte (to-integer/unsigned value / 65536) and* 255
 		]
 	]
 
 	write-long: func [value [integer!]][
 		join-of write-byte value // 256 [
-			write-byte (to integer! value / 256) and* 255
-			write-byte (to integer! value / 65536) and* 255
-			write-byte (to integer! value / 16777216) and* 255
+			write-byte (to-integer/unsigned value / 256) and* 255
+			write-byte (to-integer/unsigned value / 65536) and* 255
+			write-byte (to-integer/unsigned value / 16777216) and* 255
 		]
 	]
 
@@ -1452,7 +1452,7 @@ mysql-driver: make object![
 	][
 		pl: port/locals
 
-		pl/last-status: status: to integer! port/data/1
+		pl/last-status: status: to-integer/unsigned port/data/1
 		pl/error-code: pl/error-msg: _
 
 		switch status [
@@ -1642,7 +1642,7 @@ mysql-driver: make object![
 
 			reading-fields [
 				pkt-type: 'OTHER
-				if 0 != to integer! first buf [; string with a length of 0, will be confused as an OK packet
+				if 0 != to-integer/unsigned first buf [; string with a length of 0, will be confused as an OK packet
 					pkt-type: parse-a-packet port
 				]
 				switch/default pkt-type [
@@ -1716,7 +1716,7 @@ mysql-driver: make object![
 
 			reading-rows [
 				pkt-type: 'OTHER
-				if 0 != to integer! first buf [; string with a length of 0, will be confused as an OK packet
+				if 0 != to-integer/unsigned first buf [; string with a length of 0, will be confused as an OK packet
 					pkt-type: parse-a-packet port
 				]
 				switch/default pkt-type [
@@ -1853,7 +1853,7 @@ mysql-driver: make object![
 				write-long tcp-port-param
 				;write-long (length port/user) + (length port/pass)
 				;	+ 7 + std-header-length
-				write-long to integer! #1000000 ;max packet length, the value 16M is from mysql.exe
+				write-long to-integer/unsigned #1000000 ;max packet length, the value 16M is from mysql.exe
 				write-byte pl/character-set
 				{^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@} ;23 0's
 				write-string any [port/spec/user ""]
