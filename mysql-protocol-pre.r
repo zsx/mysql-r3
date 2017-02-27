@@ -1674,7 +1674,7 @@ mysql-driver: make object![
 						]
 						blob-to-text: [blob text tinyblob tinytext mediumblob mediumtext longblob longtext]
 						unless blank? text-type: select blob-to-text col/type [
-							unless found? find col/flags 'binary [
+							unless find? col/flags 'binary [
 								col/type: text-type
 							]
 						]
