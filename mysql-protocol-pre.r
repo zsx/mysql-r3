@@ -1038,6 +1038,7 @@ mysql-driver: make object![
 				foreach row rows :convert-body
 			]
 		]
+		return convert-body
 	]
 	
 	decode: func [int [integer!] /features /flags /type /local list name value][
@@ -2368,6 +2369,7 @@ send-sql: func [
 		]
 		cause-error 'Access 'timeout reduce [port _ _]
 	]
+	_
 ]
 
 connect-sql: func [
