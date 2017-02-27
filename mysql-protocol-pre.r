@@ -891,7 +891,7 @@ mysql-driver: make object![
 	;-------
 		auto-commit: on		; not used, just reserved for /Command compatibility.
 		delimiter: #";"
-		newlines?: value? 'new-line
+		newlines?: not void? 'new-line
 		last-insert-id: make block! 1
 		affected-rows: 0
 		init:
