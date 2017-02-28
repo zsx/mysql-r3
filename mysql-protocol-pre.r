@@ -1489,7 +1489,7 @@ mysql-driver: make object![
 			]
 			0 [
 				if none? pl/expecting [
-					rules: [
+					rules: copy [
 						read-length	(pl/current-result/affected-rows: len)
 						read-length (pl/current-result/last-insert-id: len)
 						read-int	(pl/more-results?: not zero? int and 8)
