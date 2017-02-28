@@ -1549,7 +1549,7 @@ mysql-driver: make object![
 		]
 	]
 
-	process-a-packet: func [
+	process-a-packet: proc [
 		port [port!]
 		buf [binary!] "the packet buffer"
 		/local
