@@ -757,9 +757,7 @@ mysql-driver: make object![
 	sql-buffer: make string! 1024
 	not-squote: complement charset "'"
 	not-dquote: complement charset {"}
-
-	close*:		get in system/contexts/lib 'close
-
+	
 	std-header-length: 4
 	std-comp-header-length:	3
 	end-marker: 254
@@ -1818,7 +1816,7 @@ mysql-driver: make object![
 		]
 
 		if pl/protocol = -1 [
-			close* tcp-port
+			close tcp-port
 			fail ["Server configuration denies access to locals source^/Port closed!"]
 		]
 
