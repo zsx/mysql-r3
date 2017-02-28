@@ -945,9 +945,9 @@ mysql-driver: make object![
 				mm: copy*/part skip v 5 2
 				dd: copy*/part skip v 8 2
 				either (to-integer/unsigned mm) <> 0 [
-					to date! rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy]
+					to-date rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy]
 				][
-					to date! rejoin ["01-Jan-"yy]
+					to-date rejoin ["01-Jan-"yy]
 				]
 			] 
 			1-jan-0000
@@ -963,9 +963,9 @@ mysql-driver: make object![
 				h: copy*/part skip v 11 2
 				m: copy*/part skip v 14 2
 				either (to-integer/unsigned mm) <> 0 [
-					to date! rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy "/" h ":" m]
+					to-date rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy "/" h ":" m]
 				][
-					to date! rejoin ["01-Jan-" yy "/" h ":" m]
+					to-date rejoin ["01-Jan-" yy "/" h ":" m]
 				] 
 			]
 			1-jan-0000/00:00
