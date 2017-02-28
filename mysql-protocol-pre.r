@@ -2341,8 +2341,8 @@ send-sql: func [
 	either string? data [
 		data: reduce [data]
 	][
-		;if locked? data [data: copy data]
-		data: copy data
+		if locked? data [data: copy data]
+		;data: copy data
 	]
 	insert data make mysql-driver/result-option-class [
 		flat?: to-logic flat
