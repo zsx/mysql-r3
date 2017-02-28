@@ -1356,7 +1356,7 @@ mysql-driver: make object![
 	write-string: func [value [string! blank! binary!] /local t][
 		if blank? value [return make binary! 0]
 		;debug ["writing a string:" mold value]
-		to-binary join-of value to char! 0
+		to-binary join-of value to-char 0
 	]
 	
 	send-packet: func [port [port!] data [binary!] /local tcp-port header][
