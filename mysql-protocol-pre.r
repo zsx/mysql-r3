@@ -758,7 +758,6 @@ mysql-driver: make object![
 	not-squote: complement charset "'"
 	not-dquote: complement charset {"}
 
-	copy*:		get in system/contexts/lib 'copy
 	insert*:	get in system/contexts/lib  'insert
 	close*:		get in system/contexts/lib 'close
 
@@ -941,9 +940,9 @@ mysql-driver: make object![
 	my-to-date: func [v	/local mm dd yy][
 		any [
 			attempt [
-				yy: copy*/part v 4
-				mm: copy*/part skip v 5 2
-				dd: copy*/part skip v 8 2
+				yy: copy/part v 4
+				mm: copy/part skip v 5 2
+				dd: copy/part skip v 8 2
 				either (to-integer/unsigned mm) <> 0 [
 					to-date rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy]
 				][
@@ -956,12 +955,12 @@ mysql-driver: make object![
 	my-to-datetime: func [v /local mm dd yy h m][
 		any [
 			attempt [
-				yy: copy*/part v 4
-				mm: copy*/part skip v 5 2
-				dd: copy*/part skip v 8 2
+				yy: copy/part v 4
+				mm: copy/part skip v 5 2
+				dd: copy/part skip v 8 2
 				
-				h: copy*/part skip v 11 2
-				m: copy*/part skip v 14 2
+				h: copy/part skip v 11 2
+				m: copy/part skip v 14 2
 				either (to-integer/unsigned mm) <> 0 [
 					to-date rejoin [dd "-" month/(to-integer/unsigned mm) "-" yy "/" h ":" m]
 				][
@@ -1113,7 +1112,7 @@ mysql-driver: make object![
 			]
 			time!	[join-of "'" [value/hour ":" value/minute ":" value/second "'"]]
 			money!	[head remove find mold value "$"]
-			string!	[join-of "'" [sql-escape copy* value "'"]]
+			string!	[join-of "'" [sql-escape copy value "'"]]
 			binary!	[to-sql-binary value]
 			block!	[
 				if empty? value: reduce value [return "()"]
@@ -1128,7 +1127,7 @@ mysql-driver: make object![
 	
 	mysql-map-rebol-values: func [data [block!] /local args sql mark][
 		args: reduce next data
-		sql: copy* pick data 1
+		sql: copy pick data 1
 		mark: sql
 		while [mark: find mark #"?"][
 			mark: insert* remove mark either tail? args ["NULL"][to-sql args/1]
@@ -1256,7 +1255,7 @@ mysql-driver: make object![
 		scramble: func [data [string! blank!] port [port!] /v10 /local seed][
 			if any [blank? data empty? data][return make binary! 0]
 			seed: port/locals/crypt-seed
-			if v10 [return crypt-v10 data copy*/part seed 8]
+			if v10 [return crypt-v10 data copy/part seed 8]
 			either port/locals/protocol > 9 [
 				either port/locals/auth-v11 [
 					crypt-v11 to-binary data seed
@@ -1316,7 +1315,7 @@ mysql-driver: make object![
 	read-field: [ ;length coded string
 		(null-flag: false)
 		read-length s: (either null-flag [field: _]
-			[field:	copy*/part s len s: skip s len]) :s
+			[field:	copy/part s len s: skip s len]) :s
 	]
 	
 	read-cmd: func [port [port!] cmd [integer!] /local res][
@@ -1812,7 +1811,7 @@ mysql-driver: make object![
 			10 skip		; reserved for future use
 			read-bin-string	(
 				if string [
-					pl/crypt-seed: join-of copy* pl/crypt-seed string
+					pl/crypt-seed: join-of copy pl/crypt-seed string
 					pl/auth-v11: yes
 				]
 			)
