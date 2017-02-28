@@ -1327,7 +1327,7 @@ mysql-driver: make object![
 	
 ;------ Data sending ------
 
-	write-byte: func [value [integer!]][
+	write-byte: func [value [integer!] /local b][
 		b: skip to binary! value 7
 	]
 	
@@ -1356,7 +1356,7 @@ mysql-driver: make object![
 		to-binary join value to char! 0
 	]
 	
-	send-packet: func [port [port!] data [binary!] /local tcp-port][
+	send-packet: func [port [port!] data [binary!] /local tcp-port header][
 		tcp-port: port
 		while [16777215 <= length? data] [; size < 2**24 - 1
 			header: join
@@ -1511,7 +1511,7 @@ mysql-driver: make object![
 
 	start-next-cmd: func [
 		port [port!]
-		/local pl
+		/local pl qry
 	][
 		pl: port/locals
 		either empty? pl/o-buf [
@@ -1552,6 +1552,7 @@ mysql-driver: make object![
 		/local
 		pl
 		col
+		row
 		mysql-port
 		pkt-type
 		blob-to-text
@@ -1777,11 +1778,11 @@ mysql-driver: make object![
 			cause-error 'user 'message rejoin [rejoin ["never be here in read" pl/status]]
 		]
 	]
-
+	tcp-port-param: none
 	process-greeting-packet: func [
 		port [port!]
 		data [binary!]
-		/local pl tcp-port
+		/local pl tcp-port feature-supported?
 	][
 		debug ["processing a greeting packet"]
 		tcp-port: port
@@ -1840,7 +1841,7 @@ mysql-driver: make object![
 
 	pack-auth-packet: func [
 		port [port!]
-		/local pl auth-pack path
+		/local pl auth-pack path key
 	][
 		pl: port/locals
 		path: to binary! skip port/spec/path 1
@@ -2039,7 +2040,7 @@ mysql-driver: make object![
 		port [port!]
 		data [string! block!]
 		options [object!]
-		/local pl
+		/local pl res
 	][
 		pl: port/locals
 		;debug ["do-tcp-insert" mold data]
@@ -2067,6 +2068,7 @@ mysql-driver: make object![
 
 	open-tcp-port: func [
 		port [port!] "mysql port"
+		/local conn
 	][
 		conn: make port![
 			scheme: 'tcp
@@ -2170,7 +2172,7 @@ sys/make-scheme [
 	
 	awake: func [
 		event [event!]
-		/local pl cb
+		/local pl cb mode
 	][
 		debug ["mysql port event:" event/type]
 		pl: event/port/locals
