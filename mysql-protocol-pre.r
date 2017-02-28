@@ -2340,10 +2340,10 @@ send-sql: func [
 		data: reduce [data]
 	]
 	insert data make mysql-driver/result-option-class [
-		flat?: to logic! flat
-		auto-conv?: not to logic! raw
-		named?: to logic! named
-		verbose?: to logic! verbose
+		flat?: to-logic flat
+		auto-conv?: not to-logic raw
+		named?: to-logic named
+		verbose?: to-logic verbose
 		async?: either async [:cb][off]
 	]
 
