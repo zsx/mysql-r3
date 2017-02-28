@@ -1331,7 +1331,7 @@ mysql-driver: make object![
 ;------ Data sending ------
 
 	write-byte: func [value [integer!]][
-		b: skip to binary! value 7
+		b: skip to-binary value 7
 	]
 	
 	write-int: func [value [integer!]][
@@ -1847,7 +1847,7 @@ mysql-driver: make object![
 		/local pl auth-pack path
 	][
 		pl: port/locals
-		path: to binary! skip port/spec/path 1
+		path: to-binary skip port/spec/path 1
 		auth-pack: either pl/capabilities and defs/client/protocol-41 [
 			rejoin [
 				write-long tcp-port-param
