@@ -758,7 +758,6 @@ mysql-driver: make object![
 	not-squote: complement charset "'"
 	not-dquote: complement charset {"}
 
-	insert*:	get in system/contexts/lib  'insert
 	close*:		get in system/contexts/lib 'close
 
 	std-header-length: 4
@@ -1024,7 +1023,7 @@ mysql-driver: make object![
 			if void? conv-func: select p/locals/conv-list col/type [
 				;;debug ["conv-func:" mold conv-func "for" col/type]
 				append convert-body append/only compose action head
-					insert* at compose [change at row (i) :tmp] 5 conv-func
+					insert at compose [change at row (i) :tmp] 5 conv-func
 			]
 		]
 		;;debug ["convert-body:" mold convert-body]
@@ -1130,7 +1129,7 @@ mysql-driver: make object![
 		sql: copy pick data 1
 		mark: sql
 		while [mark: find mark #"?"][
-			mark: insert* remove mark either tail? args ["NULL"][to-sql args/1]
+			mark: insert remove mark either tail? args ["NULL"][to-sql args/1]
 			if not tail? args [args: next args]
 		]
 		;debug sql
@@ -1425,7 +1424,7 @@ mysql-driver: make object![
 				| "begin" thru "end"
 				| e: d (
 					clear sql-buffer
-					insert*/part sql-buffer s e
+					insert/part sql-buffer s e
 					res: insert-query port sql-buffer
 				  ) any [ws] s:
 				| skip
@@ -1730,9 +1729,9 @@ mysql-driver: make object![
 							pl/current-result/rows: make block! 10
 						]
 						either pl/result-options/flat? [
-							insert* tail pl/current-result/rows row
+							insert tail pl/current-result/rows row
 						][
-							insert*/only tail pl/current-result/rows row
+							insert/only tail pl/current-result/rows row
 						]
 						pl/stream-end?: false
 						pl/saved-status: 'reading-rows
