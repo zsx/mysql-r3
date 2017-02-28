@@ -9,7 +9,7 @@ REBOL [
 	Purpose: "MySQL Driver for REBOL"
 	GIT-COMMIT: "<GIT-COMMIT-ID>"
 	Type: 'module
-	Export: [send-sql connect-sql last-mysql-cmd]
+	Exports: [send-sql connect-sql last-mysql-cmd]
 ]
 mysql-errors: [
 ;imported from mysqld_error.h in libmysqtcp-port
@@ -1330,7 +1330,7 @@ mysql-driver: make object![
 	
 ;------ Data sending ------
 
-	write-byte: func [value [integer!]][
+	write-byte: func [value [integer!] /local b][
 		b: skip to-binary value 7
 	]
 	
@@ -1476,7 +1476,8 @@ mysql-driver: make object![
 						[read-string (pl/error-msg: string)]
 					]
 				]
-				fail reduce [port pl/error-code pl/error-msg]
+				;modify it latter, not decide how to write mysql-error
+				fail reduce [pl/error-code pl/error-msg]
 				return 'ERR
 			]
 			254 [
@@ -1556,6 +1557,7 @@ mysql-driver: make object![
 		pl
 		col
 		mysql-port
+		row
 		pkt-type
 		blob-to-text
 		text-type
@@ -1844,7 +1846,7 @@ mysql-driver: make object![
 
 	pack-auth-packet: func [
 		port [port!]
-		/local pl auth-pack path
+		/local pl auth-pack path key
 	][
 		pl: port/locals
 		path: to-binary skip port/spec/path 1
@@ -2043,7 +2045,7 @@ mysql-driver: make object![
 		port [port!]
 		data [string! block!]
 		options [object!]
-		/local pl
+		/local pl res
 	][
 		pl: port/locals
 		;debug ["do-tcp-insert" mold data]
@@ -2339,7 +2341,8 @@ send-sql: func [
 	either string? data [
 		data: reduce [data]
 	][
-		if locked? data [data: copy data]
+		;if locked? data [data: copy data]
+		data: copy data
 	]
 	insert data make mysql-driver/result-option-class [
 		flat?: to-logic flat
