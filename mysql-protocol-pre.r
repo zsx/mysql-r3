@@ -974,12 +974,12 @@ mysql-driver: make object![
 	
 	
 	conv-model: [
-		decimal			[to decimal! to-string]
+		decimal			[to-decimal to-string]
 		tiny			[to-integer/unsigned to-string]
 		short			[to-integer/unsigned to-string]
 		long			[to-integer/unsigned to-string]
-		float			[to decimal! to-string]
-		double			[to decimal! to-string]
+		float			[to-decimal to-string]
+		double			[to-decimal to-string]
 		null			[to-string]
 		timestamp		[to-string]
 		longlong		[to-integer/unsigned to-string]
@@ -991,7 +991,7 @@ mysql-driver: make object![
 		newdate			[to-string]
 		var-char		[to-string]
 		bit				_
-		new-decimal		[to decimal! to-string]
+		new-decimal		[to-decimal to-string]
 		enum			[to-string]
 		set				[to-string]
 		tiny-blob		_
