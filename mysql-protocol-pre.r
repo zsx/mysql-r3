@@ -974,37 +974,37 @@ mysql-driver: make object![
 	
 	
 	conv-model: [
-		decimal			[to decimal! to string!]
-		tiny			[to-integer/unsigned to string!]
-		short			[to-integer/unsigned to string!]
-		long			[to-integer/unsigned to string!]
-		float			[to decimal! to string!]
-		double			[to decimal! to string!]
-		null			[to string!]
-		timestamp		[to string!]
-		longlong		[to-integer/unsigned to string!]
-		int24			[to-integer/unsigned to string!]
-		date			[my-to-date to string!]
-		time			[to time! to string!]
-		datetime		[my-to-datetime to string!]
-		year			[to-integer/unsigned to string!]
-		newdate			[to string!]
-		var-char		[to string!]
+		decimal			[to decimal! to-string]
+		tiny			[to-integer/unsigned to-string]
+		short			[to-integer/unsigned to-string]
+		long			[to-integer/unsigned to-string]
+		float			[to decimal! to-string]
+		double			[to decimal! to-string]
+		null			[to-string]
+		timestamp		[to-string]
+		longlong		[to-integer/unsigned to-string]
+		int24			[to-integer/unsigned to-string]
+		date			[my-to-date to-string]
+		time			[to time! to-string]
+		datetime		[my-to-datetime to-string]
+		year			[to-integer/unsigned to-string]
+		newdate			[to-string]
+		var-char		[to-string]
 		bit				_
-		new-decimal		[to decimal! to string!]
-		enum			[to string!]
-		set				[to string!]
+		new-decimal		[to decimal! to-string]
+		enum			[to-string]
+		set				[to-string]
 		tiny-blob		_
 		medium-blob		_
 		long-blob		_
 		blob			_
-		tiny-text		[to string!]
-		medium-text		[to string!]
-		long-text		[to string!]
-		text			[to string!]
-		var-string		[to string!]
-		string			[to string!]
-		geometry		[to string!]
+		tiny-text		[to-string]
+		medium-text		[to-string]
+		long-text		[to-string]
+		text			[to-string]
+		var-string		[to-string]
+		string			[to-string]
+		geometry		[to-string]
 	]
 	
 	change-type-handler: func [p [port!] type [word!] blk [block!]][
@@ -1280,7 +1280,7 @@ mysql-driver: make object![
 	ws: charset " ^-^M^/"
 
 	read-bin-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
-	read-string: [read-bin-string (string: to string! string)] ;null-terminated string
+	read-string: [read-bin-string (string: to-string string)] ;null-terminated string
 	read-byte: [copy byte byte-char (byte: to-integer/unsigned :byte)]
 
 	;mysql uses little endian for all integers
@@ -1650,12 +1650,12 @@ mysql-driver: make object![
 						col: make column-class []
 						either pl/capabilities and defs/client/protocol-41 [
 							parse/case buf [
-								read-field 	(col/catalog: to string! field)
-								read-field 	(col/db: to string! field)
-								read-field	(col/table: to string!	field)
-								read-field	(col/org_table: to string!	field)
-								read-field	(col/name: to string! field)
-								read-field	(col/org_name: to string! field)
+								read-field 	(col/catalog: to-string field)
+								read-field 	(col/db: to-string field)
+								read-field	(col/table: to-string	field)
+								read-field	(col/org_table: to-string	field)
+								read-field	(col/name: to-string field)
+								read-field	(col/org_name: to-string field)
 								read-byte	;filler
 								read-int	(col/charsetnr: int)
 								read-long	(col/length: long)
@@ -1667,8 +1667,8 @@ mysql-driver: make object![
 							]
 						][
 							parse/case buf [
-								read-field	(col/table:	to string! field)
-								read-field	(col/name: 	to string! field)
+								read-field	(col/table:	to-string field)
+								read-field	(col/name: 	to-string field)
 								read-length	(col/length: len)
 								read-length	(col/type: decode/type len)
 								read-length	(col/flags: decode/flags len)
