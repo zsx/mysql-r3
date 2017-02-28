@@ -1442,7 +1442,7 @@ mysql-driver: make object![
 		either type [
 			send-cmd port type next data
 		][
-			cause-error 'user 'message reform ["Unknown command" data/1]
+			fail reform ["Unknown command" data/1]
 		]
 	]
 
@@ -1476,7 +1476,7 @@ mysql-driver: make object![
 						[read-string (pl/error-msg: string)]
 					]
 				]
-				cause-error 'user 'message reduce [port pl/error-code pl/error-msg]
+				fail reduce [port pl/error-code pl/error-msg]
 				return 'ERR
 			]
 			254 [
@@ -1545,7 +1545,7 @@ mysql-driver: make object![
 				append system/ports/system make event! [type: evt-type port: mysql-port]
 			]
 		][
-			cause-error 'user 'message reduce [rejoin ["Unsupported event: " type]]
+			fail reduce [rejoin ["Unsupported event: " type]]
 		]
 	]
 
@@ -1581,7 +1581,7 @@ mysql-driver: make object![
 							read-int        (pl/error-code: int)
 							read-string (pl/error-msg: string)
 						]
-						cause-error 'Access 'cannot-open reduce [port pl/error-msg pl/error-code]
+						fail make error! [type: 'Access id: 'cannot-open arg1: port arg2: join-of pl/error-msg pl/error-code]
 					]
 					;debug ["handshaked"]
 					;OK?
@@ -1620,7 +1620,7 @@ mysql-driver: make object![
 								pl/saved-status: 'reading-fields
 							]
 							'else [
-								cause-error 'user 'message reduce ["Unexpected response" pl]
+								fail reduce ["Unexpected response" pl]
 							]
 						]
 					]
@@ -1633,7 +1633,7 @@ mysql-driver: make object![
 						leave
 					]
 				][
-					cause-error 'user 'message reduce ["Unexpected number of fields" pl]
+					fail reduce ["Unexpected number of fields" pl]
 				]
 				pl/status: 'reading-packet-head
 				pl/next-packet-length: std-header-length
@@ -1702,12 +1702,12 @@ mysql-driver: make object![
 								leave
 							]
 							'else [
-								cause-error 'user 'message reduce ["unexpected EOF" pl]
+								fail reduce ["unexpected EOF" pl]
 							]
 						]
 					]
 				][
-					cause-error 'user 'message reduce ["Unexpected fields" pl]
+					fail reduce ["Unexpected fields" pl]
 				]
 				pl/stream-end?: false
 				pl/status: 'reading-packet-head
@@ -1767,7 +1767,7 @@ mysql-driver: make object![
 					]
 				][
 					;debug ["unexpected row" mold pl]
-					cause-error 'user 'message reduce ["Unexpected row" pl]
+					fail reduce ["Unexpected row" pl]
 				]
 				debug ["stream-end? after reading-rows:" pl/stream-end?]
 			]
@@ -1777,7 +1777,7 @@ mysql-driver: make object![
 				break
 			]
 		][
-			cause-error 'user 'message rejoin [rejoin ["never be here in read" pl/status]]
+			fail rejoin [rejoin ["never be here in read" pl/status]]
 		]
 	]
 
@@ -1795,7 +1795,7 @@ mysql-driver: make object![
 				read-int 	(pl/error-code: int)
 				read-string (pl/error-msg: string)
 			]
-			cause-error 'Access 'message reduce [pl/error-code pl/error-msg]
+			fail reduce [pl/error-code pl/error-msg]
 		]
 		parse data [
 			read-byte 	(pl/protocol: byte)
@@ -1819,7 +1819,7 @@ mysql-driver: make object![
 
 		if pl/protocol = -1 [
 			close* tcp-port
-			cause-error 'user 'message ["Server configuration denies access to locals source^/Port closed!"]
+			fail ["Server configuration denies access to locals source^/Port closed!"]
 		]
 
 		;show-server pl
@@ -1900,7 +1900,7 @@ mysql-driver: make object![
 		;pl/exit-wait?: false
 		switch event/type [
 			error [
-				cause-error 'Access 'read-error reduce [event/port "unknown" event]
+				fail make error! [type: 'Access  id: 'read-error arg1: event/port arg2: join-of "unknow " event]
 				return true
 			]
 			lookup [
@@ -1973,7 +1973,7 @@ mysql-driver: make object![
 								]
 							]
 						][
-							cause-error 'user 'message reduce [rejoin ["should never be here: read " pl/status]]
+							fail reduce [rejoin ["should never be here: read " pl/status]]
 						]
 					]
 				]
@@ -1991,7 +1991,7 @@ mysql-driver: make object![
 							empty? pl/results
 							empty? pl/current-result/rows
 						][
-							cause-error 'user 'message ["rows is not properly initialized"]
+							fail ["rows is not properly initialized"]
 						]
 						;debug ["result is properly initialized"]
 					]
@@ -2002,7 +2002,7 @@ mysql-driver: make object![
 						pl/saved-status: 'reading-old-auth-resp
 					]
 				][
-					cause-error 'user 'message reduce [rejoin ["never be here in wrote " pl/status]]
+					fail reduce [rejoin ["never be here in wrote " pl/status]]
 				]
 
 				read tcp-port
@@ -2052,7 +2052,7 @@ mysql-driver: make object![
 		pl/query-start-time: now/precise
 		if all [string? data data/1 = #"["][data: load data]
 		res: either block? data [
-			if empty? data [cause-error 'user 'message ["No data!"]]
+			if empty? data [fail ["No data!"]]
 			either string? data/1 [
 				insert-query port mysql-map-rebol-values data
 			][
@@ -2129,7 +2129,7 @@ mysql-driver: make object![
 					]
 					either opts/flat? [
 						if ret/n-columns < length ret/rows [
-							cause-error 'user 'message ["/flat and /name-fields can't be used for this case, because of multiple rows"]
+							fail ["/flat and /name-fields can't be used for this case, because of multiple rows"]
 						]
 						ret: name-fields ret/rows ret/columns
 					][
@@ -2211,7 +2211,7 @@ sys/make-scheme [
 								;ignored
 							]
 							'else [
-								cause-error 'user 'message reduce [rejoin ["unsupported callback:" mold cb]]
+								fail reduce [rejoin ["unsupported callback:" mold cb]]
 							]
 						]
 						remove/part pl/pending-requests pl/pending-block-size
@@ -2222,7 +2222,7 @@ sys/make-scheme [
 						return true
 					]
 				][
-					cause-error 'user 'message reduce [rejoin ["unsupported query mode: " mold mode]]
+					fail reduce [rejoin ["unsupported query mode: " mold mode]]
 				]
 			]
 			wrote [
@@ -2230,10 +2230,10 @@ sys/make-scheme [
 			]
 			close [
 				debug ["port closed"]
-				cause-error 'Access 'not-connected reduce [event/port _ _]
+				fail make error! [type: 'Access id: 'not-connected arg1: event/port]
 			]
 		][
-			cause-error 'user 'message reduce [rejoin ["unsupported event type on mysql port:" event/type]]
+			fail reduce [rejoin ["unsupported event type on mysql port:" event/type]]
 		]
 		false
 	]
@@ -2292,7 +2292,7 @@ sys/make-scheme [
 					append pl/pending-requests reduce ['sync _]
 				][
 					if options/named? [
-						cause-error 'user 'message ["/named can't be used with /async"]
+						fail ["/named can't be used with /async"]
 					]
 					append pl/pending-requests reduce ['async :options/async?]
 				]
@@ -2333,7 +2333,7 @@ send-sql: func [
 	pl: port/locals
 
 	unless any [async open? port] [
-		cause-error 'Access 'not-connected reduce [port _ _]
+		fail make error! [type: 'Access id: 'not-connected arg1: port]
 	]
 
 	either string? data [
@@ -2369,11 +2369,11 @@ send-sql: func [
 				return port/data
 			][
 				;debug "wait returned _"
-				cause-error 'Access 'timeout reduce [port _ _]
+				fail make error! [type: 'Access id: 'timeout arg1: port]
 			]
 			;debug ["trying again..."]
 		]
-		cause-error 'Access 'timeout reduce [port _ _]
+		fail make error! [type: 'Access id: 'timeout arg1: port]
 	]
 	_
 ]
@@ -2385,7 +2385,7 @@ connect-sql: func [
 	port/locals/exit-wait-after-handshaked?: true
 	p: wait/only [port port/locals/tcp-port port/spec/timeout]
 	if port? p [return port]
-	cause-error 'Access 'timeout reduce [port _ _]
+	faile make error! [type: 'Access id: 'timeout arg1: port]
 ]
 
 last-mysql-cmd: func [
