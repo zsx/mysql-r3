@@ -1448,7 +1448,7 @@ mysql-driver: make object![
 
 	parse-a-packet: func [
 		port [port!]
-		/local pl
+		/local pl status rules
 	][
 		pl: port/locals
 
@@ -1492,7 +1492,7 @@ mysql-driver: make object![
 			]
 			0 [
 				if blank? pl/expecting [
-					rules: [
+					rules: copy [
 						read-length	(pl/current-result/affected-rows: len)
 						read-length (pl/current-result/last-insert-id: len)
 						read-int	(pl/more-results?: not zero? int and* 8)
@@ -1588,7 +1588,7 @@ mysql-driver: make object![
 					emit-event port 'connect
 					;debug ["o-buf after auth resp:" mold port/locals/o-buf]
 					start-next-cmd port
-					exit
+					leave
 				]
 			]
 
@@ -1598,7 +1598,7 @@ mysql-driver: make object![
 
 					;debug ["o-buf after old auth resp:" mold port/locals/o-buf]
 					start-next-cmd port
-					exit
+					leave
 				]
 			]
 
@@ -1630,7 +1630,7 @@ mysql-driver: make object![
 						append pl/results pl/current-result
 						emit-event port 'read
 						start-next-cmd port
-						exit
+						leave
 					]
 				][
 					cause-error 'user 'message reduce ["Unexpected number of fields" pl]
@@ -1699,7 +1699,7 @@ mysql-driver: make object![
 								emit-event port 'read
 								pl/stream-end?: true
 								start-next-cmd port
-								exit
+								leave
 							]
 							'else [
 								cause-error 'user 'message reduce ["unexpected EOF" pl]
@@ -1762,7 +1762,7 @@ mysql-driver: make object![
 							emit-event port 'read
 							;debug ["o-buf after reading query resp:" mold port/locals/o-buf]
 							start-next-cmd port
-							exit
+							leave
 						]
 					]
 				][
@@ -2336,8 +2336,10 @@ send-sql: func [
 		cause-error 'Access 'not-connected reduce [port _ _]
 	]
 
-	if string? data [
+	either string? data [
 		data: reduce [data]
+	][
+		if locked? data [data: copy data]
 	]
 	insert data make mysql-driver/result-option-class [
 		flat?: to-logic flat
