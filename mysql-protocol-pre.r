@@ -1578,7 +1578,7 @@ mysql-driver: make object![
 				][
 					if buf/1 = 255 [;error packet
 						parse/all skip buf 1 [
-							read-int        (pl/error-code: int)
+							read-int		(pl/error-code: int)
 							read-string (pl/error-msg: string)
 						]
 						cause-error 'Access 'cannot-open reduce [port pl/error-msg pl/error-code]
@@ -2288,7 +2288,7 @@ sys/make-scheme [
 		insert: func [
 			port [port!]
 			data [block!] "hackish: if the first element in the block is an object, then it's an option object"
-			/local tcp-port options pl
+			/local tcp-port options pl query
 		][
 			pl: port/locals
 			tcp-port: pl/tcp-port
@@ -2302,13 +2302,13 @@ sys/make-scheme [
 					]
 					append pl/pending-requests reduce ['async :options/async?]
 				]
-				
-				remove data ;remove the first element
+				query: data/2
 			][
 				append pl/pending-requests reduce ['sync none]
+				query: data
 			]
 			;debug ["inserting a query:" mold data mold pl/pending-requests]
-			mysql-driver/tcp-insert tcp-port data options
+			mysql-driver/tcp-insert tcp-port query options
 			;;debug ["tcp-port locals after insert" mold tcp-port/locals]
 		]
 		
@@ -2342,15 +2342,15 @@ send-sql: func [
 		cause-error 'Access 'not-connected reduce [port none none]
 	]
 
-	if string? data [
-		data: reduce [data]
-	]
-	insert data make mysql-driver/result-option-class [
-		flat?: to logic! flat
-		auto-conv?: not to logic! raw
-		named?: to logic! named
-		verbose?: to logic! verbose
-		async?: either async [:cb][off]
+	data: reduce [
+		make mysql-driver/result-option-class [
+			flat?: to logic! flat
+			auto-conv?: not to logic! raw
+			named?: to logic! named
+			verbose?: to logic! verbose
+			async?: either async [:cb][off]
+		]
+		data
 	]
 
 	insert port data
