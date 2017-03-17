@@ -743,9 +743,7 @@ mysql-errors: [
 	ER_ERROR_LAST 1727
 ]
 
-mysql-debug?: off
-
-either mysql-debug? [
+either all [value? 'mysql-debug? mysql-debug?] [
 	debug: :print
 ][
 	debug: :comment
@@ -1136,7 +1134,7 @@ mysql-driver: make object![
 	]
 	
 	show-server: func [obj [object!]][
-		debug reform [											newline
+		debug [														newline
 			"----- Server ------" 									newline
 			"Version:"					obj/version					newline
 			"Protocol version:"			obj/protocol 				newline
@@ -1407,7 +1405,7 @@ mysql-driver: make object![
 	]
 	
 	insert-query: func [port [port!] data [string! block!]][
-		;debug reform ["insert-query:" data]
+		debug ["insert-query:" data]
 		send-cmd port defs/cmd/query data
 		none
 	]
@@ -1449,6 +1447,7 @@ mysql-driver: make object![
 	][
 		pl: port/locals
 
+		;debug ["parsing a packet:" mold port/data]
 		pl/last-status: status: to integer! port/data/1
 		pl/error-code: pl/error-msg: none
 
@@ -1531,6 +1530,7 @@ mysql-driver: make object![
 		mysql-port: pl/mysql-port
 		case compose [
 			(evt-type = 'read) [
+				debug ["emitting result (" length? pl/results ")"]
 				mysql-port/data: convert-results port pl/results pl/result-options
 				append system/ports/system make event! [type: evt-type port: mysql-port]
 			]
@@ -1560,12 +1560,13 @@ mysql-driver: make object![
 	][
 		pl: port/locals
 		mysql-port: pl/mysql-port
-		debug ["processing a packet in status:" pl/status]
+		;debug ["processing a packet in status:" pl/status]
 		switch pl/status [
 			reading-greeting [
 				process-greeting-packet port buf ;status changed to sending-auth-pack
 				send-packet port pack-auth-packet port
 				pl/status: 'sending-auth-pack
+				debug ["status changed to sending-auth-pack"]
 			]
 
 			reading-auth-resp [
@@ -1573,6 +1574,7 @@ mysql-driver: make object![
 					;switch to old password mode
 					send-packet port write-string scramble/v10 port/pass port
 					pl/status: 'sending-old-auth-pack
+					debug ["status changed to sending-old-auth-pack"]
 				][
 					if buf/1 = 255 [;error packet
 						parse/all skip buf 1 [
@@ -1602,7 +1604,7 @@ mysql-driver: make object![
 
 			reading-cmd-resp [;reading a response
 				;check if we've got enough data
-				debug ["read a cmd response for" pl/current-cmd]
+				;debug ["read a cmd response for" pl/current-cmd]
 				pl/stream-end?: false
 				switch/default parse-a-packet port [
 					OTHER [
@@ -1613,7 +1615,9 @@ mysql-driver: make object![
 									read-length (if zero? pl/current-result/n-columns: len [
 											pl/stream-end?: true 
 											debug ["stream ended because of 0 columns"]
-										])
+										]
+										debug ["Read number of columns:" len]
+									)
 								]
 								pl/saved-status: 'reading-fields
 							]
@@ -1624,6 +1628,7 @@ mysql-driver: make object![
 					]
 					OK [;other cmd response
 						pl/stream-end?: true
+						debug ["Stream ended by an OK packet"]
 						pl/current-result/query-finish-time: now/precise
 						append pl/results pl/current-result
 						emit-event port 'read
@@ -1682,7 +1687,7 @@ mysql-driver: make object![
 						if none? pl/current-result/columns [
 							pl/current-result/columns: make block! pl/current-result/n-columns
 						]
-						debug ["read a column:" mold col]
+						;debug ["read a column: " col/name]
 						append pl/current-result/columns :col
 						pl/saved-status: 'reading-fields
 					]
@@ -1692,6 +1697,7 @@ mysql-driver: make object![
 								pl/saved-status: 'reading-rows
 							]
 							(pl/current-cmd = defs/cmd/field-list) [
+								debug ["result ended for field-list"]
 								pl/current-result/query-finish-time: now/precise
 								append pl/results pl/current-result
 								emit-event port 'read
@@ -1720,9 +1726,9 @@ mysql-driver: make object![
 				switch/default pkt-type [
 					OTHER [
 						row: make block! pl/current-result/n-columns
-						debug ["row buf:" copy/part buf pl/next-packet-length]
+						;debug ["row buf:" copy/part buf pl/next-packet-length]
 						parse/all/case buf [pl/current-result/n-columns [read-field (append row field)]]
-						debug ["row:" mold row]
+						;debug ["row:" mold row]
 						if none? pl/current-result/rows [
 							pl/current-result/rows: make block! 10
 						]
@@ -1736,6 +1742,7 @@ mysql-driver: make object![
 						pl/status: 'reading-packet-head
 						pl/next-packet-length: std-header-length
 					]
+					; TODO: an OK packet can be sent here if CLIENT_DEPRECATE_EOF was set for MySQL > 5.7
 					EOF [
 						pl/stream-end?: true
 						if pl/result-options/auto-conv? [convert-types port pl/current-result/rows]
@@ -1747,7 +1754,7 @@ mysql-driver: make object![
 							]
 						]
 						pl/current-result/query-finish-time: now/precise
-						;debug ["result: " mold pl/current-result]
+						debug ["Length of rows in current result:" length? pl/current-result/rows]
 						append pl/results pl/current-result
 						;debug ["results length: " length? pl/results]
 						either pl/more-results? [
@@ -1757,6 +1764,7 @@ mysql-driver: make object![
 							pl/next-packet-length: std-header-length
 							pl/current-result: make result-class [query-start-time: pl/query-start-time] ;get ready for next result set
 						][
+							debug ["Emitting read event because of no more results"]
 							emit-event port 'read
 							;debug ["o-buf after reading query resp:" mold port/locals/o-buf]
 							start-next-cmd port
@@ -1767,7 +1775,7 @@ mysql-driver: make object![
 					;debug ["unexpected row" mold pl]
 					cause-error 'user 'message reduce ["Unexpected row" pl]
 				]
-				debug ["stream-end? after reading-rows:" pl/stream-end?]
+				;debug ["stream-end? after reading-rows:" pl/stream-end?]
 			]
 
 			idle [
@@ -1891,7 +1899,7 @@ mysql-driver: make object![
 		pl: tcp-port/locals
 		pl/last-activity: now/precise
 
-		;debug ["tcp event:" event/type]
+		debug ["tcp event:" event/type]
 		;debug ["o-buf:" mold tcp-port/locals/o-buf]
 		;;debug ["locals:" mold tcp-port/locals]
 		;pl/exit-wait?: false
@@ -1914,34 +1922,33 @@ mysql-driver: make object![
 			read [
 				;;debug "read event"
 				;debug ["buffer:" mold tcp-port/data]
-				debug ["current buffer length:" length? tcp-port/data ", data length:" length? tcp-port/data]
-				debug ["after adding data, length of buffer:" length? tcp-port/data]
+				;debug ["current buffer length:" length? tcp-port/data]
 				;debug ["buffer with data:" mold tcp-port/data]
 				while [true] [
-					debug ["next-len:" pl/next-packet-length ", buf: " length? tcp-port/data]
+					;debug ["next-len:" pl/next-packet-length ", buf: " length? tcp-port/data]
 					either pl/next-packet-length > length? tcp-port/data [; not enough data
 						read tcp-port
 						;debug ["keep reading"]
 						break
 					][
-						debug ["current status:" pl/status]
+						;debug ["current status:" pl/status]
 						switch/default pl/status [
 							reading-packet-head [
-								debug ["read a packet head" mold copy/part tcp-port/data std-header-length]
+								;debug ["read a packet head" mold copy/part tcp-port/data std-header-length]
 								parse/all tcp-port/data [
 									read-int24  (pl/packet-len: int24)
 									read-byte	(pl/seq-num: byte)
 								]
 								pl/status: 'reading-packet
 								pl/next-packet-length: pl/packet-len
-								debug ["expected length of next packet:" pl/next-packet-length]
+								;debug ["expected length of next packet:" pl/next-packet-length]
 								remove/part tcp-port/data std-header-length
 							]
 							reading-packet [
-								debug ["read a packet"]
+								;debug ["read a packet"]
 								either pl/packet-len < 16777215 [; a complete packet is read
 									pl/status: pl/saved-status ;restore the status back to what it was
-									debug ["a COMPLETE packet is received"]
+									;debug ["a COMPLETE packet is received"]
 									either pl/data-in-buf? [
 										append/part pl/buf tcp-port/data pl/packet-len
 										process-a-packet tcp-port pl/buf ;adjust `status' for next step
@@ -2011,6 +2018,7 @@ mysql-driver: make object![
 			]
 			close [
 				;close mysql-port
+				debug ["TCP port closed"]
 				close tcp-port
 				emit-event tcp-port 'close
 				return true
@@ -2214,7 +2222,8 @@ sys/make-scheme [
 						remove/part pl/pending-requests pl/pending-block-size
 					]
 					sync [
-						debug ["sync mode should exit"]
+						debug ["got response (" length? event/port/data ")"]
+						;debug ["sync mode should exit"]
 						remove/part pl/pending-requests pl/pending-block-size
 						return true
 					]
@@ -2325,7 +2334,7 @@ send-sql: func [
 	/named
 	/async cb [word! path! function! block! none!] "call send-sql asynchronously: set result to word, call function with the result or evaluate the block"
 	/verbose "return detailed info"
-	/local result pl old-handshaked?
+	/local result pl old-handshaked? ret-from-wait
 ][
 	pl: port/locals
 
@@ -2346,23 +2355,27 @@ send-sql: func [
 
 	insert port data
 	;debug ["send-sql: " mold data]
-	debug ["in send-sql, current pending requests:" mold pl/pending-requests]
+	;debug ["in send-sql, current pending requests:" mold pl/pending-requests]
 	unless async [
 		;debug ["handshaked?:" pl/handshaked?]
 		old-handshaked?: pl/handshaked?
 		while [pl/last-activity + port/spec/timeout >= now/precise][
-			either port? either all [
+			either port = ret-from-wait: either all [
 				system/product = 'atronix-view
 				any [0 < second system/version 0 < third system/version]
 				][
 					wait/only [port port/locals/tcp-port port/spec/timeout] ;/only refinement is an atronix enhancement after 3.0.90
 				][
-					wait [port port/spec/timeout]
+					wait [port port/locals/tcp-port port/spec/timeout]
 				][ ;will not return unless: 1) handshaked, 2) sync request processed, or 3) error
 				;assert [empty? pl/pending-requests]
-				debug ["port/data:" mold port/data]
+				;debug ["port/data:" mold port/data]
 				return port/data
 			][
+				if port? ret-from-wait [
+					assert [ret-from-wait = port/locals/tcp-port]
+					print ["******* Unexpected wakeup from tcp-port *********"]
+				]
 				;debug "wait returned none"
 				cause-error 'Access 'timeout reduce [port none none]
 			]
