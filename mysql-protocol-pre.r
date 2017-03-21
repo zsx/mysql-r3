@@ -1351,8 +1351,7 @@ mysql-driver: make object![
 		to-binary join value to char! 0
 	]
 	
-	send-packet: func [port [port!] data [binary!] /local tcp-port header][
-		tcp-port: port
+	pack-packet: func [port [port!] data /local header][
 		while [16777215 <= length? data] [; size < 2**24 - 1
 			header: join
 				#{FFFFFF}
@@ -1369,7 +1368,11 @@ mysql-driver: make object![
 			write-byte port/locals/seq-num: port/locals/seq-num + 1
 
 		insert data header
-		write tcp-port head data
+		head data
+	]
+
+	send-packet: func [port [port!] data [binary!] /local tcp-port header][
+		write port pack-packet port data
 	]
 
 	send-cmd: func [port [port!] cmd [integer!] cmd-data] compose/deep [
@@ -1501,6 +1504,9 @@ mysql-driver: make object![
 				]
 				return 'OK
 			]
+			251 [; #fb
+				return 'FB
+			]
 		]
 		return 'OTHER
 	]
@@ -1554,6 +1560,7 @@ mysql-driver: make object![
 		pkt-type
 		blob-to-text
 		text-type
+		infile-data
 	][
 		pl: port/locals
 		mysql-port: pl/mysql-port
@@ -1638,6 +1645,26 @@ mysql-driver: make object![
 								query-start-time: pl/current-result/query-start-time
 							]
 						]
+					]
+					FB [;LOCAL INFILE request
+						unless parse next buf [
+							read-string (file-name: string)
+						][
+							cause-error 'user 'message reduce ["unrecognized LOCAL INFILE request:" buf]
+						]
+
+						if error? err: try [
+							infile-data: read to file! file-name
+						][
+							pl/stream-end?: true
+							do err
+						]
+
+						write port join
+							pack-packet port write-string infile-data
+							pack-packet port #{} ;last empty packet to end it
+						pl/stream-end?: true
+						pl/state: 'sending-infile-data
 					]
 				][
 					cause-error 'user 'message reduce ["Unexpected number of fields" pl]
@@ -1844,6 +1871,7 @@ mysql-driver: make object![
 			or defs/client/secure-connection
 			or defs/client/multi-queries
 			or defs/client/multi-results
+			or defs/client/local-files
 		][
 			tcp-port-param and complement defs/client/long-password
 		]
@@ -2001,6 +2029,10 @@ mysql-driver: make object![
 					]
 					sending-old-auth-pack [
 						pl/state: 'reading-old-auth-resp
+					]
+					sending-infile-data [
+						pl/state: 'reading-cmd-resp ;an OK packet is expected
+						pl/stream-end?: false
 					]
 				][
 					cause-error 'user 'message reduce [rejoin ["never be here in wrote " pl/state]]
