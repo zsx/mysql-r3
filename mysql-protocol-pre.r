@@ -2137,47 +2137,49 @@ mysql-driver: make object![
 		port [port!] "tcp port"
 		results [block!]
 		opts [object!]
-		/local ret tmp name-fields
+		/local ret tmp name-fields r
 	][
 		;debug ["converting results:" mold results]
 		either any [
-			1 < length? results
 			port/locals/current-cmd != defs/cmd/query
 		][;results from multiple queries
 			return results
 		][
-			ret: first results
-			unless opts/verbose? [
-				either opts/named? [
-					name-fields: func [
-						rows [block!]
-						columns [block!]
-						/local tmp n
+			r: make block! length? results
+			foreach ret results [
+				unless opts/verbose? [
+					either opts/named? [
+						name-fields: func [
+							rows [block!]
+							columns [block!]
+							/local tmp n
+						][
+							tmp: make block! 2 * length? rows
+							repeat n length? columns [
+								append tmp columns/:n/name
+								append tmp rows/:n
+							]
+							tmp
+						]
+						either opts/flat? [
+							if ret/n-columns < length? ret/rows [
+								cause-error 'user 'message ["/flat and /name-fields can't be used for this case, because of multiple rows"]
+							]
+							ret: name-fields ret/rows ret/columns
+						][
+							rows: ret/rows
+							forall rows [
+								change/only rows name-fields first rows ret/columns
+							]
+							ret: rows
+						]
 					][
-						tmp: make block! 2 * length? rows
-						repeat n length? columns [
-							append tmp columns/:n/name
-							append tmp rows/:n
-						]
-						tmp
+						ret: ret/rows
 					]
-					either opts/flat? [
-						if ret/n-columns < length? ret/rows [
-							cause-error 'user 'message ["/flat and /name-fields can't be used for this case, because of multiple rows"]
-						]
-						ret: name-fields ret/rows ret/columns
-					][
-						rows: ret/rows
-						forall rows [
-							change/only rows name-fields first rows ret/columns
-						]
-						ret: rows
-					]
-				][
-					ret: ret/rows
 				]
+				append/only r ret
 			]
-			return ret
+			return either 1 = length? r [r/1][r]
 		]
 	]
 
