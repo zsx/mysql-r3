@@ -1271,7 +1271,6 @@ mysql-driver: make object![
 	b0: b1: b2: b3: int: int24: long: string: field: len: byte: s: none
 	byte-char: complement charset []
 	null: to-char 0
-	null-flag: false
 	ws: charset " ^-^M^/"
 
 	read-bin-string: [[copy string to null null] | [copy string to end]] ;null-terminated string
@@ -1302,16 +1301,14 @@ mysql-driver: make object![
 		read-long (long64: (shift long 32) or low)
 	]
 	read-length: [; length coded binary
-		#"^(FB)" (len: 0 null-flag: true)
-		| #"^(FC)" read-int (len: int)
+		#"^(FC)" read-int (len: int)
 		| #"^(FD)" read-int24 (len: int24)
 		| #"^(FE)" read-long64 (len: long64)
 		| read-byte (len: byte)
 	]
 	read-field: [ ;length coded string
-		(null-flag: false)
-		read-length s: (either null-flag [field: none]
-			[field:	copy*/part s len s: skip s len]) :s
+		"^(FB)" (field: none)
+		| read-length copy field [len byte-char]
 	]
 	
 	read-cmd: func [port [port!] cmd [integer!] /local res][
