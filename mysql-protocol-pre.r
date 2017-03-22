@@ -1757,7 +1757,7 @@ mysql-driver: make object![
 					pkt-type: parse-a-packet port
 				]
 				switch/default pkt-type [
-					OTHER [
+					OTHER FB[
 						row: make block! pl/current-result/n-columns
 						;debug ["row buf:" copy/part buf pl/next-packet-length]
 						parse/all/case buf [pl/current-result/n-columns [read-field (append row field)]]
